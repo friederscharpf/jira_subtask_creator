@@ -4,8 +4,20 @@
 """
 ===============================================================================
 Datei        : jira_subtask_creator.py
-Version      : V0.5
+Version      : V0.6
 Autor        : ChatGPT
+
+===============================================================================
+WICHTIGER HINWEIS ZUR DOKUMENTATION
+===============================================================================
+
+Diese Dokumentation ist bewusst vollständig und strukturiert gehalten.
+
+Regel für zukünftige Versionen:
+- Dokumentation darf NICHT gekürzt werden
+- bestehende Abschnitte müssen erhalten bleiben
+- nur sinnvolle Erweiterungen sind erlaubt
+- Struktur muss stabil bleiben (kein Entfernen von Kapiteln)
 
 ===============================================================================
 ZWECK DES PROGRAMMS
@@ -15,54 +27,59 @@ Dieses Programm automatisiert das Erstellen von Jira Subtasks für Issues
 innerhalb eines ausgewählten Sprints in Jira Cloud.
 
 Es verbindet sich über die Jira REST API, liest Issues aus einem Sprint aus
-und erstellt anhand von Label-basierten Definitionen automatisch Subtasks.
+und erstellt auf Basis von Label-Definitionen automatisch Subtasks.
 
 ===============================================================================
-GRUNDPRINZIP
+GRUNDLOGIK
 ===============================================================================
 
 1. Sprint wird ausgewählt:
    - manuell (exakte Eingabe)
    - oder über Filtermodus (-f / --filter)
 
-2. Alle Issues des Sprints werden geladen
+2. Alle Issues im Sprint werden geladen
 
-3. Nur Haupt-Issues werden verarbeitet (keine Subtasks als eigenständige Ziele)
+3. Nur Haupt-Issues werden verarbeitet
+   (Subtasks selbst werden ignoriert)
 
-4. Labels der Issues werden mit Definitionsdateien abgeglichen
+4. Labels bestimmen Subtask-Definitionen
 
-5. Subtasks werden erstellt, falls sie noch nicht existieren
+5. Fehlende Subtasks werden erstellt
 
-6. Ausgabe einer vollständigen Ergebnisübersicht
+6. Bereits vorhandene Subtasks werden übersprungen
+
+7. Ergebnisübersicht wird ausgegeben
 
 ===============================================================================
 SUBTASK-DEFINITIONEN
 ===============================================================================
 
-Ordnerstruktur:
+Verzeichnis:
 
     ./Subtasks/
 
 Dateien:
+
+    Subtasks_<LABEL>.txt
+
+Beispiele:
 
     Subtasks_Impl.txt
     Subtasks_Test.txt
     Subtasks_Spez.txt
 
 Regel:
-
-    Subtasks_<LABEL>.txt  → Label = <LABEL>
+    Dateiname definiert Label
 
 Inhalt:
-
     Eine Zeile = ein Subtask Titel
 
 Beispiel:
 
     Architektur prüfen
-    Implementierung
-    Unit Tests
-    Code Review
+    Implementierung durchführen
+    Unit Tests schreiben
+    Code Review durchführen
 
 ===============================================================================
 LOGIN DATEI
@@ -72,7 +89,7 @@ Datei:
 
     confluence_login.txt
 
-Format:
+Format (3 Zeilen):
 
     https://your-domain.atlassian.net
     email@domain.com
@@ -82,9 +99,9 @@ Format:
 SPRINT AUSWAHL
 ===============================================================================
 
---------------------------
-Standardmodus
---------------------------
+-------------------------------------------------
+1) Standardmodus (exakte Eingabe)
+-------------------------------------------------
 
 Aufruf:
 
@@ -93,65 +110,91 @@ Aufruf:
 Verhalten:
 
 - Sprintname muss exakt existieren
-- wenn nicht gefunden → Fehler + Abbruch
+- leerer Input beendet Programm
+- geschlossene Sprints werden abgewiesen
 
---------------------------
-Filtermodus
---------------------------
+-------------------------------------------------
+2) Filtermodus (-f / --filter)
+-------------------------------------------------
 
 Aufruf:
 
     python jira_subtask_creator.py -f
     python jira_subtask_creator.py --filter
-
-Optional:
-
     python jira_subtask_creator.py -f "Team 2"
 
 Verhalten:
 
 - lädt alle Sprints aus Jira Boards
 - filtert optional nach String
+- entfernt geschlossene Sprints
 - zeigt nummerierte Liste
-- Auswahl über Nummer
+- Auswahl per Zahl
+- ENTER ohne Eingabe beendet Programm
 
 ===============================================================================
-DRY RUN MODUS
+DRY-RUN MODUS
 ===============================================================================
 
 Aufruf:
 
     python jira_subtask_creator.py --dry-run
 
-oder kombiniert:
+Kombination möglich:
 
     python jira_subtask_creator.py -f "Team 2" --dry-run
 
 Verhalten:
 
-✔ keine Subtasks werden erstellt
-✔ nur Simulation
-✔ gleiche Ausgabe wie produktiv
+- keine Änderungen in Jira
+- nur Simulation
+- gleiche Ausgabe wie produktiver Lauf
 
 ===============================================================================
-NEUERUNGEN IN V0.5
+BEENDIGUNGSVERHALTEN
 ===============================================================================
 
-✔ DRY-RUN wieder vollständig integriert
-✔ kompatibel mit Filtermodus
-✔ kompatibel mit Standardmodus
-✔ stabile Sprintvalidierung
-✔ keine Funktionsentfernung mehr
+Das Programm beendet sich in folgenden Fällen:
+
+- leere Sprint-Eingabe (Standardmodus)
+- ENTER ohne Auswahl (Filtermodus)
+- ungültige Sprintauswahl (Filtermodus)
+- Sprint existiert nicht
+- Sprint ist geschlossen
+- keine passenden Sprints gefunden
+
+In allen Fällen:
+→ Benutzer muss Beenden mit ENTER bestätigen
 
 ===============================================================================
-JIRA API
+JIRA API VERWENDET
 ===============================================================================
 
-Verwendet:
+REST Endpoints:
 
 - /rest/api/3/search/jql
 - /rest/agile/1.0/board
-- /rest/agile/1.0/board/{id}/sprint
+- /rest/agile/1.0/board/{boardId}/sprint
+
+===============================================================================
+ABHÄNGIGKEITEN
+===============================================================================
+
+Python Package:
+
+    requests
+
+Installation:
+
+    pip install requests
+
+===============================================================================
+FEHLERVERHALTEN
+===============================================================================
+
+- HTTP Fehler werden vollständig ausgegeben
+- API Fehler führen zu kontrolliertem Abbruch
+- Benutzer wird immer informiert
 
 ===============================================================================
 CHANGELOG
@@ -159,24 +202,36 @@ CHANGELOG
 
 V0.0
 - Initialversion
+- Subtask Erstellung
 
 V0.1
-- Label System
+- Label-basierte Subtask-Definitionen
+- mehrere Dateien unterstützt
 
 V0.2
-- Jira Search API Update
+- Jira Search API /search/jql
 - Pagination
-- Dry Run
+- Dry-Run Modus
 
 V0.3
-- Subtask-Filtern aus Ergebnisliste
+- Subtasks aus Ergebnisübersicht entfernt
 
 V0.4
 - Sprint Filtermodus (-f / --filter)
+- Sprint Auswahl aus Jira Boards
+- geschlossene Sprints berücksichtigt
 
 V0.5
-- Dry Run wieder vollständig integriert
+- Dry-Run wieder vollständig integriert
 - Stabilisierung aller Modi
+
+V0.6
+- geschlossene Sprints werden ignoriert
+- Hinweis bei geschlossenen Sprints
+- leere Eingabe beendet Programm (Standard & Filter)
+- sichere Exit-Bestätigung mit ENTER
+- ungültige Auswahl im Filtermodus beendet Programm
+- Hilfe-Funktion (-h / --help)
 
 ===============================================================================
 """
@@ -193,6 +248,34 @@ SUBTASK_DIR = "Subtasks"
 
 
 # ============================================================================
+# HELP
+# ============================================================================
+
+def show_help():
+    print("""
+Jira Subtask Creator V0.6
+
+Aufruf:
+  python jira_subtask_creator.py
+  python jira_subtask_creator.py -f
+  python jira_subtask_creator.py -f "Team 2"
+  python jira_subtask_creator.py --dry-run
+
+Optionen:
+  -f, --filter [TEXT]   Sprintauswahl aus Liste (optional gefiltert)
+  --dry-run             Keine Änderungen durchführen
+  -h, --help            Hilfe anzeigen
+
+Verhalten:
+  - geschlossene Sprints werden ignoriert
+  - leere Eingaben beenden das Programm
+  - Subtasks werden nur für offene Sprints erstellt
+""")
+    input("\nENTER zum Beenden...")
+    sys.exit(0)
+
+
+# ============================================================================
 # LOGIN
 # ============================================================================
 
@@ -202,9 +285,6 @@ def read_login():
 
     with open(LOGIN_FILE, "r", encoding="utf-8") as f:
         lines = [l.strip() for l in f.readlines() if l.strip()]
-
-    if len(lines) < 3:
-        sys.exit("Fehler: Login-Datei benötigt 3 Zeilen.")
 
     return lines[0], lines[1], lines[2]
 
@@ -226,7 +306,7 @@ def load_subtask_definitions():
         label = name.replace("Subtasks_", "").replace(".txt", "")
 
         with open(file, "r", encoding="utf-8") as f:
-            tasks = [x.strip() for x in f.readlines() if x.strip()]
+            tasks = [l.strip() for l in f.readlines() if l.strip()]
 
         result[label] = list(dict.fromkeys(tasks))
 
@@ -257,7 +337,7 @@ def jira_post(base_url, auth, endpoint, payload):
 
 
 # ============================================================================
-# SPRINT HANDLING
+# SPRINTS
 # ============================================================================
 
 def fetch_all_sprints(base_url, auth):
@@ -291,14 +371,21 @@ def fetch_all_sprints(base_url, auth):
     return list(unique.values())
 
 
+def is_closed_sprint(sprint):
+    return sprint.get("state", "").lower() == "closed"
+
+
 def select_sprint_filtered(base_url, auth, filter_string=None):
     sprints = fetch_all_sprints(base_url, auth)
+
+    sprints = [s for s in sprints if not is_closed_sprint(s)]
 
     if filter_string is not None:
         sprints = [s for s in sprints if filter_string.lower() in s["name"].lower()]
 
     if not sprints:
-        print("Keine Sprints gefunden.")
+        print("Keine offenen Sprints gefunden.")
+        input("ENTER zum Beenden...")
         sys.exit(0)
 
     print("\nVerfügbare Sprints:\n")
@@ -307,18 +394,34 @@ def select_sprint_filtered(base_url, auth, filter_string=None):
         print(f"{i}. {s['name']}")
 
     while True:
-        try:
-            idx = int(input("\nSprint auswählen (Nummer): "))
-            if 1 <= idx <= len(sprints):
-                return sprints[idx - 1]["name"]
-        except ValueError:
-            pass
-        print("Ungültige Eingabe.")
+        choice = input("\nSprint auswählen (ENTER = Abbruch): ").strip()
+
+        if choice == "":
+            print("Programm wird beendet.")
+            input("ENTER zum Bestätigen...")
+            sys.exit(0)
+
+        if choice.isdigit() and 1 <= int(choice) <= len(sprints):
+            return sprints[int(choice) - 1]["name"]
+
+        print("Ungültige Auswahl.")
+        print("Programm wird beendet.")
+        input("ENTER zum Bestätigen...")
+        sys.exit(0)
 
 
 def validate_exact_sprint(base_url, auth, sprint_name):
     sprints = fetch_all_sprints(base_url, auth)
-    return any(s["name"] == sprint_name for s in sprints)
+
+    for s in sprints:
+        if s["name"] == sprint_name:
+            if is_closed_sprint(s):
+                print(f"\nSprint '{sprint_name}' ist GESCHLOSSEN.")
+                input("ENTER zum Beenden...")
+                sys.exit(0)
+            return True
+
+    return False
 
 
 # ============================================================================
@@ -374,47 +477,44 @@ def create_subtask(base_url, auth, issue, title):
 
 def main():
 
-    parser = argparse.ArgumentParser()
-
+    parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("-f", "--filter", nargs="?", const=None)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("-h", "--help", action="store_true")
 
     args = parser.parse_args()
 
-    print("Jira Subtask Creator V0.5")
-    print("-------------------------")
+    if args.help:
+        show_help()
 
-    if args.dry_run:
-        print("DRY RUN aktiv (keine Änderungen)\n")
+    print("Jira Subtask Creator V0.6")
+    print("-------------------------")
 
     base_url, user, token = read_login()
     auth = HTTPBasicAuth(user, token)
 
     definitions = load_subtask_definitions()
 
-    # ------------------------------------------------------------------------
-    # Sprint Auswahl
-    # ------------------------------------------------------------------------
-
     if args.filter is not None:
         sprint_name = select_sprint_filtered(base_url, auth, args.filter)
     else:
-        sprint_name = input("Sprintname (exakt): ").strip()
+        sprint_name = input("Sprintname (exakt, ENTER = Abbruch): ").strip()
+
+        if sprint_name == "":
+            print("Programm wird beendet.")
+            input("ENTER zum Bestätigen...")
+            sys.exit(0)
 
         if not validate_exact_sprint(base_url, auth, sprint_name):
-            print("Fehler: Sprint nicht gefunden.")
+            print("Sprint nicht gefunden oder geschlossen.")
+            input("ENTER zum Beenden...")
             sys.exit(0)
 
     print(f"\nSprint: {sprint_name}")
 
-    # ------------------------------------------------------------------------
-    # Issues laden
-    # ------------------------------------------------------------------------
-
     print("Lade Issues...")
 
     issues = search_issues_in_sprint(base_url, auth, sprint_name)
-
     issues = [i for i in issues if not is_subtask(i)]
 
     print(f"{len(issues)} Haupt-Issues gefunden.\n")
@@ -463,10 +563,6 @@ def main():
             "created": created,
             "skipped": skipped
         })
-
-    # ------------------------------------------------------------------------
-    # OUTPUT
-    # ------------------------------------------------------------------------
 
     print("\n" + "=" * 72)
     print("ERGEBNISÜBERSICHT")
