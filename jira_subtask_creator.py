@@ -4,128 +4,105 @@
 """
 ===============================================================================
 Datei        : jira_subtask_creator.py
-Version      : V0.1
+Version      : V0.2
 Autor        : ChatGPT
 
 ===============================================================================
 BESCHREIBUNG
 ===============================================================================
 
-Dieses Python-Programm verbindet sich mit einer Atlassian JIRA Cloud Instanz
-über die REST API und erstellt automatisch Unteraufgaben (Subtasks) für alle
-Issues eines angegebenen Sprints.
+Dieses Python-Programm verbindet sich mit Atlassian Jira Cloud über die REST API
+und erstellt automatisch Unteraufgaben (Subtasks) für alle Issues eines
+angegebenen Sprints.
 
-Dabei werden automatisch alle Definitionsdateien im Unterordner:
+Die anzulegenden Unteraufgaben werden aus Textdateien im Unterordner:
 
     ./Subtasks/
 
-eingelesen.
+geladen.
 
 Beispiele:
 
     Subtasks/Subtasks_Impl.txt
-    Subtasks/Subtasks_Spez.txt
     Subtasks/Subtasks_Test.txt
+    Subtasks/Subtasks_Spez.txt
 
-Der Dateiname bestimmt das erforderliche Label / Stichwort.
+Der Dateiname definiert das benötigte Label.
 
 Beispiel:
 
     Subtasks_Impl.txt
 
-=> Alle Issues im Sprint, die das Label:
+=> Alle Issues im Sprint mit Label:
 
     Impl
 
-besitzen, erhalten die dort definierten Unteraufgaben.
+erhalten die darin definierten Unteraufgaben.
 
--------------------------------------------------------------------------------
-UNTERSTÜTZTE ISSUE-TYPEN
--------------------------------------------------------------------------------
+===============================================================================
+NEUERUNGEN IN V0.2
+===============================================================================
 
-Es werden ALLE Issue-Typen berücksichtigt:
+✔ Jira Cloud neue Search API (/search/jql)
+✔ Pagination für >100 / >200 Issues
+✔ robuste Fehlerausgabe
+✔ Dry-Run Modus (nur anzeigen, nichts anlegen)
+✔ doppelte Unteraufgaben verhindern
+✔ Abschlussübersicht verbessert
+✔ internes Logging in Konsole
 
-- Story
-- Task
-- Bug
-- Epic (falls im Sprint)
-- Eigene Custom Typen
-- usw.
-
-Nur bereits vorhandene Unteraufgaben selbst werden ignoriert.
-
--------------------------------------------------------------------------------
-WICHTIGE FUNKTIONEN
--------------------------------------------------------------------------------
-
-✔ Sprint darf aktiv, geplant oder im Backlog sein  
-✔ Alle Subtask-Dateien werden automatisch erkannt  
-✔ Labels werden ausgewertet  
-✔ Vorhandene Unteraufgaben werden erkannt  
-✔ Doppelte Unteraufgaben werden nicht erneut angelegt  
-✔ Abschließende Übersichtsausgabe je Issue
-
--------------------------------------------------------------------------------
-DATEISTRUKTUR
--------------------------------------------------------------------------------
+===============================================================================
+VERZEICHNISSTRUKTUR
+===============================================================================
 
 jira_subtask_creator.py
 confluence_login.txt
 Subtasks/
     Subtasks_Impl.txt
-    Subtasks_Spez.txt
     Subtasks_Test.txt
 
--------------------------------------------------------------------------------
-DATEI: confluence_login.txt
--------------------------------------------------------------------------------
+===============================================================================
+LOGIN DATEI
+===============================================================================
 
-3 Zeilen:
+Datei: confluence_login.txt
 
+Zeile 1:
     https://deinfirma.atlassian.net
+
+Zeile 2:
     deine.mail@firma.de
+
+Zeile 3:
     API_TOKEN
 
--------------------------------------------------------------------------------
-DATEI: Subtasks/Subtasks_Impl.txt
--------------------------------------------------------------------------------
-
-Eine Zeile = ein Subtask Titel
-
-Beispiel:
-
-    Code erstellen
-    Unit Test erstellen
-    Review durchführen
-
--------------------------------------------------------------------------------
+===============================================================================
 VERWENDUNG
--------------------------------------------------------------------------------
+===============================================================================
 
-Start:
+Normal:
 
     python jira_subtask_creator.py
 
-Dann Sprintname eingeben:
+Dry Run:
 
-    Sprint 42
+    python jira_subtask_creator.py --dry-run
 
--------------------------------------------------------------------------------
+===============================================================================
 CHANGELOG
--------------------------------------------------------------------------------
+===============================================================================
 
 V0.0
 - Erstversion
 
 V0.1
-- Programmname angepasst
-- Subtasks Ordner eingeführt
-- Mehrere Subtask-Dateien möglich
-- Label-Auswertung statt Summary Text
-- Alle Issue Typen erlaubt
-- Sprintstatus irrelevant
-- Übersicht am Ende
-- Vorhandene Unteraufgaben erkennen
+- Labels / mehrere Dateien / Übersicht
+
+V0.2
+- neue Jira Search API
+- Pagination
+- Dry Run
+- Verbesserungen
 
 ===============================================================================
 """
@@ -133,6 +110,7 @@ V0.1
 import os
 import sys
 import glob
+import argparse
 import requests
 from requests.auth import HTTPBasicAuth
 
@@ -146,15 +124,13 @@ SUBTASK_DIR = "Subtasks"
 
 def read_login():
     if not os.path.exists(LOGIN_FILE):
-        print(f"Fehler: {LOGIN_FILE} nicht gefunden.")
-        sys.exit(1)
+        sys.exit(f"Fehler: {LOGIN_FILE} nicht gefunden.")
 
     with open(LOGIN_FILE, "r", encoding="utf-8") as f:
         lines = [x.strip() for x in f.readlines() if x.strip()]
 
     if len(lines) < 3:
-        print("Fehlerhafte Login-Datei.")
-        sys.exit(1)
+        sys.exit("Fehler: confluence_login.txt benötigt 3 Zeilen.")
 
     return lines[0], lines[1], lines[2]
 
@@ -162,29 +138,23 @@ def read_login():
 def load_subtask_definitions():
     """
     Lädt alle Dateien Subtasks_*.txt
-    Rückgabe:
-        {
-            "Impl": ["Code", "Test"],
-            "Spez": [...]
-        }
     """
     result = {}
 
     if not os.path.isdir(SUBTASK_DIR):
-        print(f"Fehler: Ordner '{SUBTASK_DIR}' fehlt.")
-        sys.exit(1)
+        sys.exit(f"Fehler: Ordner '{SUBTASK_DIR}' fehlt.")
 
     files = glob.glob(os.path.join(SUBTASK_DIR, "Subtasks_*.txt"))
 
     for file in files:
-        name = os.path.basename(file)
-        label = name.replace("Subtasks_", "").replace(".txt", "").strip()
+        filename = os.path.basename(file)
+        label = filename.replace("Subtasks_", "").replace(".txt", "").strip()
 
         with open(file, "r", encoding="utf-8") as f:
             tasks = [x.strip() for x in f.readlines() if x.strip()]
 
         if tasks:
-            result[label] = tasks
+            result[label] = list(dict.fromkeys(tasks))
 
     return result
 
@@ -192,15 +162,22 @@ def load_subtask_definitions():
 def jira_get(base_url, auth, endpoint, params=None):
     url = base_url + endpoint
     r = requests.get(url, auth=auth, params=params)
-    r.raise_for_status()
+
+    if not r.ok:
+        raise Exception(f"{r.status_code}: {r.text}")
+
     return r.json()
 
 
 def jira_post(base_url, auth, endpoint, payload):
     url = base_url + endpoint
     headers = {"Content-Type": "application/json"}
+
     r = requests.post(url, auth=auth, json=payload, headers=headers)
-    r.raise_for_status()
+
+    if not r.ok:
+        raise Exception(f"{r.status_code}: {r.text}")
+
     return r.json()
 
 
@@ -210,18 +187,31 @@ def jira_post(base_url, auth, endpoint, payload):
 
 def search_issues_in_sprint(base_url, auth, sprint_name):
     """
-    Holt alle Issues eines Sprints.
+    Holt alle Issues eines Sprints per Pagination.
     """
-    jql = f'sprint = "{sprint_name}"'
+    start_at = 0
+    max_results = 100
+    all_issues = []
 
-    params = {
-        "jql": jql,
-        "maxResults": 200,
-        "fields": "summary,labels,issuetype,project,subtasks"
-    }
+    while True:
+        params = {
+            "jql": f'sprint = "{sprint_name}" ORDER BY key',
+            "startAt": start_at,
+            "maxResults": max_results,
+            "fields": "summary,labels,issuetype,project,subtasks"
+        }
 
-    data = jira_get(base_url, auth, "/rest/api/3/search", params)
-    return data["issues"]
+        data = jira_get(base_url, auth, "/rest/api/3/search/jql", params)
+
+        issues = data.get("issues", [])
+        all_issues.extend(issues)
+
+        if len(issues) < max_results:
+            break
+
+        start_at += max_results
+
+    return all_issues
 
 
 def create_subtask(base_url, auth, issue, title):
@@ -248,13 +238,21 @@ def create_subtask(base_url, auth, issue, title):
 # ============================================================================
 
 def main():
-    print("JIRA Subtask Creator V0.1")
-    print("--------------------------")
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dry-run", action="store_true")
+    args = parser.parse_args()
+
+    print("Jira Subtask Creator V0.2")
+    print("-------------------------")
+
+    if args.dry_run:
+        print("DRY RUN aktiv - es werden keine Subtasks erstellt.\n")
 
     sprint = input("Sprintname eingeben: ").strip()
 
     if not sprint:
-        print("Kein Sprint angegeben.")
+        print("Abbruch.")
         return
 
     base_url, user, token = read_login()
@@ -262,27 +260,21 @@ def main():
 
     definitions = load_subtask_definitions()
 
-    if not definitions:
-        print("Keine Subtask Definitionen gefunden.")
-        return
-
     print("\nGefundene Regeln:")
-    for label in definitions:
-        print(f" - Label '{label}' -> {len(definitions[label])} Subtasks")
+    for label, tasks in definitions.items():
+        print(f"  {label}: {len(tasks)} Einträge")
 
     print("\nLade Sprint Issues...")
 
     try:
         issues = search_issues_in_sprint(base_url, auth, sprint)
     except Exception as e:
-        print("Fehler beim Laden:", e)
+        print(f"\nFehler beim Laden: {e}")
         return
 
-    if not issues:
-        print("Keine Issues gefunden.")
-        return
+    print(f"{len(issues)} Issues gefunden.\n")
 
-    summary = []
+    report = []
 
     for issue in issues:
 
@@ -290,49 +282,60 @@ def main():
         fields = issue["fields"]
 
         issue_type = fields["issuetype"]["name"]
-        title = fields["summary"]
+        summary = fields["summary"]
         labels = fields.get("labels", [])
 
         existing = set()
-        for s in fields.get("subtasks", []):
-            existing.add(s["fields"]["summary"])
+
+        for sub in fields.get("subtasks", []):
+            existing.add(sub["fields"]["summary"])
 
         created = []
         skipped = []
 
         for label in labels:
-            if label in definitions:
 
-                for subtask_title in definitions[label]:
+            if label not in definitions:
+                continue
 
-                    if subtask_title in existing:
-                        skipped.append(subtask_title)
-                        continue
+            for task in definitions[label]:
 
-                    try:
-                        create_subtask(base_url, auth, issue, subtask_title)
-                        created.append(subtask_title)
-                        existing.add(subtask_title)
+                if task in existing:
+                    skipped.append(task)
+                    continue
 
-                    except Exception:
-                        skipped.append(subtask_title)
+                if args.dry_run:
+                    created.append(task + " [DRY RUN]")
+                    existing.add(task)
+                    continue
 
-        summary.append({
+                try:
+                    create_subtask(base_url, auth, issue, task)
+                    created.append(task)
+                    existing.add(task)
+
+                except Exception as e:
+                    skipped.append(task + f" [Fehler]")
+
+        report.append({
             "key": key,
             "type": issue_type,
-            "title": title,
+            "summary": summary,
             "created": created,
             "skipped": skipped
         })
 
-    # Abschlussbericht
-    print("\n")
-    print("=" * 70)
-    print("ERGEBNISÜBERSICHT")
-    print("=" * 70)
+    # =========================================================================
+    # AUSGABE
+    # =========================================================================
 
-    for item in summary:
-        print(f"\n{item['key']} [{item['type']}] {item['title']}")
+    print("\n" + "=" * 72)
+    print("ERGEBNISÜBERSICHT")
+    print("=" * 72)
+
+    for item in report:
+
+        print(f"\n{item['key']} [{item['type']}] {item['summary']}")
 
         if item["created"]:
             print("  Erstellt:")
@@ -345,7 +348,7 @@ def main():
                 print(f"    - {x}")
 
         if not item["created"] and not item["skipped"]:
-            print("  Keine passenden Labels / keine Aktion.")
+            print("  Keine Aktion.")
 
     print("\nFertig.")
 
