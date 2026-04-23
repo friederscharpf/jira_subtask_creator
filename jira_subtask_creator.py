@@ -4,7 +4,7 @@
 """
 ===============================================================================
 Datei        : jira_subtask_creator.py
-Version      : V0.2
+Version      : V0.3
 Autor        : ChatGPT
 
 ===============================================================================
@@ -12,8 +12,8 @@ BESCHREIBUNG
 ===============================================================================
 
 Dieses Python-Programm verbindet sich mit Atlassian Jira Cloud über die REST API
-und erstellt automatisch Unteraufgaben (Subtasks) für alle Issues eines
-angegebenen Sprints.
+und erstellt automatisch Unteraufgaben (Subtasks) für Issues eines angegebenen
+Sprints.
 
 Die anzulegenden Unteraufgaben werden aus Textdateien im Unterordner:
 
@@ -33,23 +33,41 @@ Beispiel:
 
     Subtasks_Impl.txt
 
-=> Alle Issues im Sprint mit Label:
+=> Alle Issues im Sprint mit dem Label:
 
     Impl
 
 erhalten die darin definierten Unteraufgaben.
 
 ===============================================================================
-NEUERUNGEN IN V0.2
+UNTERSTÜTZTE ISSUE-TYPEN
 ===============================================================================
 
-✔ Jira Cloud neue Search API (/search/jql)
-✔ Pagination für >100 / >200 Issues
-✔ robuste Fehlerausgabe
-✔ Dry-Run Modus (nur anzeigen, nichts anlegen)
-✔ doppelte Unteraufgaben verhindern
-✔ Abschlussübersicht verbessert
-✔ internes Logging in Konsole
+Es werden alle normalen Sprint-Issues berücksichtigt, z.B.:
+
+- Story
+- Task
+- Bug
+- Epic (falls im Sprint)
+- Eigene Custom Typen
+
+Bereits vorhandene Subtasks werden erkannt.
+
+Reine Subtasks selbst werden NICHT separat verarbeitet und NICHT separat in der
+Ergebnisübersicht angezeigt.
+
+===============================================================================
+FUNKTIONEN
+===============================================================================
+
+✔ Jira Cloud Search API (/rest/api/3/search/jql)
+✔ Sprint darf aktiv / geplant / backlog sein
+✔ Mehrere Label-Dateien möglich
+✔ Vorhandene Unteraufgaben erkennen
+✔ Keine doppelten Unteraufgaben erstellen
+✔ Pagination für große Sprints
+✔ Dry-Run Modus
+✔ Abschlussübersicht je Haupt-Issue
 
 ===============================================================================
 VERZEICHNISSTRUKTUR
@@ -60,33 +78,67 @@ confluence_login.txt
 Subtasks/
     Subtasks_Impl.txt
     Subtasks_Test.txt
+    Subtasks_Spez.txt
 
 ===============================================================================
-LOGIN DATEI
+DATEI: confluence_login.txt
 ===============================================================================
 
-Datei: confluence_login.txt
+Die Datei muss im gleichen Verzeichnis liegen.
 
-Zeile 1:
+Inhalt (3 Zeilen):
+
     https://deinfirma.atlassian.net
-
-Zeile 2:
     deine.mail@firma.de
-
-Zeile 3:
     API_TOKEN
+
+Zeile 1 = Jira URL
+Zeile 2 = Login Mailadresse
+Zeile 3 = Atlassian API Token
+
+API Token erstellen:
+
+https://id.atlassian.com/manage-profile/security/api-tokens
+
+===============================================================================
+DATEI: Subtasks/Subtasks_Impl.txt
+===============================================================================
+
+Eine Zeile = ein Unteraufgaben-Titel
+
+Beispiel:
+
+    Code erstellen
+    Unit Test erstellen
+    Review durchführen
 
 ===============================================================================
 VERWENDUNG
 ===============================================================================
 
-Normal:
+Normal starten:
 
     python jira_subtask_creator.py
 
-Dry Run:
+Dry Run (nur anzeigen, nichts erstellen):
 
     python jira_subtask_creator.py --dry-run
+
+Danach Sprintnamen eingeben:
+
+    Sprint Team 2
+
+===============================================================================
+ERGEBNISÜBERSICHT
+===============================================================================
+
+Für jedes Haupt-Issue wird angezeigt:
+
+- Welche Unteraufgaben erstellt wurden
+- Welche bereits vorhanden waren
+- Welche übersprungen wurden
+
+Subtasks selbst erscheinen NICHT als eigener Eintrag.
 
 ===============================================================================
 CHANGELOG
@@ -96,13 +148,19 @@ V0.0
 - Erstversion
 
 V0.1
-- Labels / mehrere Dateien / Übersicht
+- Mehrere Definitionsdateien
+- Labels statt Summary Text
+- Alle Issue Typen
 
 V0.2
-- neue Jira Search API
+- Neue Jira Search API
 - Pagination
 - Dry Run
-- Verbesserungen
+- Verbesserte Fehlerbehandlung
+
+V0.3
+- Subtasks werden nicht mehr separat in Übersicht angezeigt
+- Nur Haupt-Issues werden verarbeitet
 
 ===============================================================================
 """
@@ -123,6 +181,7 @@ SUBTASK_DIR = "Subtasks"
 # ============================================================================
 
 def read_login():
+    """Liest Login-Datei ein."""
     if not os.path.exists(LOGIN_FILE):
         sys.exit(f"Fehler: {LOGIN_FILE} nicht gefunden.")
 
@@ -137,7 +196,14 @@ def read_login():
 
 def load_subtask_definitions():
     """
-    Lädt alle Dateien Subtasks_*.txt
+    Lädt alle Dateien:
+        Subtasks/Subtasks_*.txt
+
+    Rückgabe:
+        {
+            "Impl": ["Code erstellen", "Review"],
+            "Test": [...]
+        }
     """
     result = {}
 
@@ -148,20 +214,22 @@ def load_subtask_definitions():
 
     for file in files:
         filename = os.path.basename(file)
+
         label = filename.replace("Subtasks_", "").replace(".txt", "").strip()
 
         with open(file, "r", encoding="utf-8") as f:
             tasks = [x.strip() for x in f.readlines() if x.strip()]
 
         if tasks:
+            # doppelte Einträge entfernen
             result[label] = list(dict.fromkeys(tasks))
 
     return result
 
 
 def jira_get(base_url, auth, endpoint, params=None):
-    url = base_url + endpoint
-    r = requests.get(url, auth=auth, params=params)
+    """HTTP GET an Jira."""
+    r = requests.get(base_url + endpoint, auth=auth, params=params)
 
     if not r.ok:
         raise Exception(f"{r.status_code}: {r.text}")
@@ -170,10 +238,13 @@ def jira_get(base_url, auth, endpoint, params=None):
 
 
 def jira_post(base_url, auth, endpoint, payload):
-    url = base_url + endpoint
-    headers = {"Content-Type": "application/json"}
-
-    r = requests.post(url, auth=auth, json=payload, headers=headers)
+    """HTTP POST an Jira."""
+    r = requests.post(
+        base_url + endpoint,
+        auth=auth,
+        json=payload,
+        headers={"Content-Type": "application/json"}
+    )
 
     if not r.ok:
         raise Exception(f"{r.status_code}: {r.text}")
@@ -187,18 +258,19 @@ def jira_post(base_url, auth, endpoint, payload):
 
 def search_issues_in_sprint(base_url, auth, sprint_name):
     """
-    Holt alle Issues eines Sprints per Pagination.
+    Lädt alle Issues des angegebenen Sprints mit Pagination.
     """
     start_at = 0
     max_results = 100
     all_issues = []
 
     while True:
+
         params = {
             "jql": f'sprint = "{sprint_name}" ORDER BY key',
             "startAt": start_at,
             "maxResults": max_results,
-            "fields": "summary,labels,issuetype,project,subtasks"
+            "fields": "summary,labels,issuetype,project,subtasks,parent"
         }
 
         data = jira_get(base_url, auth, "/rest/api/3/search/jql", params)
@@ -214,7 +286,23 @@ def search_issues_in_sprint(base_url, auth, sprint_name):
     return all_issues
 
 
+def is_subtask(issue):
+    """
+    Erkennt, ob Issue selbst ein Subtask ist.
+    """
+    fields = issue["fields"]
+
+    if fields.get("parent"):
+        return True
+
+    issuetype = fields.get("issuetype", {})
+    return issuetype.get("subtask", False)
+
+
 def create_subtask(base_url, auth, issue, title):
+    """
+    Erstellt Unteraufgabe.
+    """
     payload = {
         "fields": {
             "project": {
@@ -240,14 +328,19 @@ def create_subtask(base_url, auth, issue, title):
 def main():
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Nur anzeigen, nichts erstellen"
+    )
+
     args = parser.parse_args()
 
-    print("Jira Subtask Creator V0.2")
+    print("Jira Subtask Creator V0.3")
     print("-------------------------")
 
     if args.dry_run:
-        print("DRY RUN aktiv - es werden keine Subtasks erstellt.\n")
+        print("DRY RUN aktiv - keine Änderungen werden durchgeführt.\n")
 
     sprint = input("Sprintname eingeben: ").strip()
 
@@ -261,6 +354,7 @@ def main():
     definitions = load_subtask_definitions()
 
     print("\nGefundene Regeln:")
+
     for label, tasks in definitions.items():
         print(f"  {label}: {len(tasks)} Einträge")
 
@@ -272,7 +366,10 @@ def main():
         print(f"\nFehler beim Laden: {e}")
         return
 
-    print(f"{len(issues)} Issues gefunden.\n")
+    # Nur Haupt-Issues behalten
+    issues = [x for x in issues if not is_subtask(x)]
+
+    print(f"{len(issues)} Haupt-Issues gefunden.")
 
     report = []
 
@@ -314,8 +411,8 @@ def main():
                     created.append(task)
                     existing.add(task)
 
-                except Exception as e:
-                    skipped.append(task + f" [Fehler]")
+                except Exception:
+                    skipped.append(task + " [Fehler]")
 
         report.append({
             "key": key,
@@ -325,9 +422,9 @@ def main():
             "skipped": skipped
         })
 
-    # =========================================================================
+    # ========================================================================
     # AUSGABE
-    # =========================================================================
+    # ========================================================================
 
     print("\n" + "=" * 72)
     print("ERGEBNISÜBERSICHT")
