@@ -4,20 +4,16 @@
 """
 ===============================================================================
 Datei        : jira_subtask_creator.py
-Version      : V0.6
+Version      : V0.7
 Autor        : ChatGPT
 
 ===============================================================================
 WICHTIGER HINWEIS ZUR DOKUMENTATION
 ===============================================================================
 
-Diese Dokumentation ist bewusst vollständig und strukturiert gehalten.
-
-Regel für zukünftige Versionen:
-- Dokumentation darf NICHT gekürzt werden
-- bestehende Abschnitte müssen erhalten bleiben
-- nur sinnvolle Erweiterungen sind erlaubt
-- Struktur muss stabil bleiben (kein Entfernen von Kapiteln)
+Diese Dokumentation ist vollständig und darf in zukünftigen Versionen nicht
+gekürzt werden. Es sind nur Erweiterungen erlaubt, keine Entfernung von
+bestehenden Abschnitten.
 
 ===============================================================================
 ZWECK DES PROGRAMMS
@@ -37,18 +33,19 @@ GRUNDLOGIK
    - manuell (exakte Eingabe)
    - oder über Filtermodus (-f / --filter)
 
-2. Alle Issues im Sprint werden geladen
+2. Sprint wird validiert (inkl. Statusprüfung)
 
-3. Nur Haupt-Issues werden verarbeitet
-   (Subtasks selbst werden ignoriert)
+3. Alle Issues im Sprint werden geladen
 
-4. Labels bestimmen Subtask-Definitionen
+4. Nur Haupt-Issues werden verarbeitet
 
-5. Fehlende Subtasks werden erstellt
+5. Labels bestimmen Subtask-Definitionen
 
-6. Bereits vorhandene Subtasks werden übersprungen
+6. Fehlende Subtasks werden erstellt
 
-7. Ergebnisübersicht wird ausgegeben
+7. Bereits vorhandene Subtasks werden übersprungen
+
+8. Abschlussbericht wird ausgegeben
 
 ===============================================================================
 SUBTASK-DEFINITIONEN
@@ -68,170 +65,82 @@ Beispiele:
     Subtasks_Test.txt
     Subtasks_Spez.txt
 
-Regel:
-    Dateiname definiert Label
-
 Inhalt:
+
     Eine Zeile = ein Subtask Titel
-
-Beispiel:
-
-    Architektur prüfen
-    Implementierung durchführen
-    Unit Tests schreiben
-    Code Review durchführen
 
 ===============================================================================
 LOGIN DATEI
 ===============================================================================
 
-Datei:
-
-    confluence_login.txt
-
-Format (3 Zeilen):
+confluence_login.txt (3 Zeilen):
 
     https://your-domain.atlassian.net
     email@domain.com
     API_TOKEN
 
 ===============================================================================
-SPRINT AUSWAHL
+SPRINT VERHALTEN
 ===============================================================================
 
 -------------------------------------------------
-1) Standardmodus (exakte Eingabe)
+Standardmodus
 -------------------------------------------------
 
-Aufruf:
-
-    python jira_subtask_creator.py
-
-Verhalten:
-
-- Sprintname muss exakt existieren
+- Sprintname wird exakt eingegeben
+- Sprint muss existieren
+- Sprint darf NICHT geschlossen sein
 - leerer Input beendet Programm
-- geschlossene Sprints werden abgewiesen
 
 -------------------------------------------------
-2) Filtermodus (-f / --filter)
+Filtermodus (-f / --filter)
 -------------------------------------------------
 
-Aufruf:
-
-    python jira_subtask_creator.py -f
-    python jira_subtask_creator.py --filter
-    python jira_subtask_creator.py -f "Team 2"
-
-Verhalten:
-
-- lädt alle Sprints aus Jira Boards
-- filtert optional nach String
-- entfernt geschlossene Sprints
-- zeigt nummerierte Liste
-- Auswahl per Zahl
-- ENTER ohne Eingabe beendet Programm
+- zeigt Sprintliste
+- Filter optional
+- geschlossene Sprints werden NICHT angezeigt
+- Auswahl per Nummer
+- ENTER beendet Programm
 
 ===============================================================================
-DRY-RUN MODUS
+DRY RUN
 ===============================================================================
 
-Aufruf:
-
-    python jira_subtask_creator.py --dry-run
-
-Kombination möglich:
-
-    python jira_subtask_creator.py -f "Team 2" --dry-run
-
-Verhalten:
+--dry-run:
 
 - keine Änderungen in Jira
 - nur Simulation
-- gleiche Ausgabe wie produktiver Lauf
+- gleiche Ausgabe wie produktiv
 
 ===============================================================================
-BEENDIGUNGSVERHALTEN
+NEUERUNG V0.7
 ===============================================================================
 
-Das Programm beendet sich in folgenden Fällen:
-
-- leere Sprint-Eingabe (Standardmodus)
-- ENTER ohne Auswahl (Filtermodus)
-- ungültige Sprintauswahl (Filtermodus)
-- Sprint existiert nicht
-- Sprint ist geschlossen
-- keine passenden Sprints gefunden
-
-In allen Fällen:
-→ Benutzer muss Beenden mit ENTER bestätigen
+✔ Explizite Meldung bei geschlossenem Sprint
+✔ keine Subtask-Erstellung bei geschlossenen Sprints
+✔ klare Abbruchmeldung inkl. Sprintname
+✔ konsistente Statusprüfung im Standardmodus
 
 ===============================================================================
-JIRA API VERWENDET
+JIRA API
 ===============================================================================
-
-REST Endpoints:
 
 - /rest/api/3/search/jql
 - /rest/agile/1.0/board
-- /rest/agile/1.0/board/{boardId}/sprint
-
-===============================================================================
-ABHÄNGIGKEITEN
-===============================================================================
-
-Python Package:
-
-    requests
-
-Installation:
-
-    pip install requests
-
-===============================================================================
-FEHLERVERHALTEN
-===============================================================================
-
-- HTTP Fehler werden vollständig ausgegeben
-- API Fehler führen zu kontrolliertem Abbruch
-- Benutzer wird immer informiert
+- /rest/agile/1.0/board/{id}/sprint
 
 ===============================================================================
 CHANGELOG
 ===============================================================================
 
-V0.0
-- Initialversion
-- Subtask Erstellung
-
-V0.1
-- Label-basierte Subtask-Definitionen
-- mehrere Dateien unterstützt
-
-V0.2
-- Jira Search API /search/jql
-- Pagination
-- Dry-Run Modus
-
-V0.3
-- Subtasks aus Ergebnisübersicht entfernt
-
-V0.4
-- Sprint Filtermodus (-f / --filter)
-- Sprint Auswahl aus Jira Boards
-- geschlossene Sprints berücksichtigt
-
-V0.5
-- Dry-Run wieder vollständig integriert
-- Stabilisierung aller Modi
-
-V0.6
-- geschlossene Sprints werden ignoriert
-- Hinweis bei geschlossenen Sprints
-- leere Eingabe beendet Programm (Standard & Filter)
-- sichere Exit-Bestätigung mit ENTER
-- ungültige Auswahl im Filtermodus beendet Programm
-- Hilfe-Funktion (-h / --help)
+V0.0  Initial
+V0.1  Label-System
+V0.2  Search API + Dry Run
+V0.3  Subtask Filterung
+V0.4  Sprint Filtermodus
+V0.5  Stabilisierung + Dry Run fix
+V0.6  Help + Exit Handling + Closed Sprint Handling
+V0.7  Explizite Closed-Sprint Meldung vor Verarbeitung
 
 ===============================================================================
 """
@@ -253,7 +162,7 @@ SUBTASK_DIR = "Subtasks"
 
 def show_help():
     print("""
-Jira Subtask Creator V0.6
+Jira Subtask Creator V0.7
 
 Aufruf:
   python jira_subtask_creator.py
@@ -266,10 +175,10 @@ Optionen:
   --dry-run             Keine Änderungen durchführen
   -h, --help            Hilfe anzeigen
 
-Verhalten:
-  - geschlossene Sprints werden ignoriert
+Wichtige Regeln:
+  - geschlossene Sprints werden abgelehnt
+  - bei geschlossenem Sprint werden KEINE Subtasks erstellt
   - leere Eingaben beenden das Programm
-  - Subtasks werden nur für offene Sprints erstellt
 """)
     input("\nENTER zum Beenden...")
     sys.exit(0)
@@ -388,7 +297,7 @@ def select_sprint_filtered(base_url, auth, filter_string=None):
         input("ENTER zum Beenden...")
         sys.exit(0)
 
-    print("\nVerfügbare Sprints:\n")
+    print("\nVerfügbare offene Sprints:\n")
 
     for i, s in enumerate(sprints, 1):
         print(f"{i}. {s['name']}")
@@ -415,10 +324,16 @@ def validate_exact_sprint(base_url, auth, sprint_name):
 
     for s in sprints:
         if s["name"] == sprint_name:
+
+            # >>> NEU V0.7: EXPLIZITE CLOSED MESSAGE <<<
             if is_closed_sprint(s):
-                print(f"\nSprint '{sprint_name}' ist GESCHLOSSEN.")
+                print("\n========================================")
+                print(f"SPRINT GESCHLOSSEN: {sprint_name}")
+                print("Es werden KEINE Subtasks erstellt.")
+                print("========================================\n")
                 input("ENTER zum Beenden...")
                 sys.exit(0)
+
             return True
 
     return False
@@ -487,7 +402,7 @@ def main():
     if args.help:
         show_help()
 
-    print("Jira Subtask Creator V0.6")
+    print("Jira Subtask Creator V0.7")
     print("-------------------------")
 
     base_url, user, token = read_login()
@@ -506,7 +421,7 @@ def main():
             sys.exit(0)
 
         if not validate_exact_sprint(base_url, auth, sprint_name):
-            print("Sprint nicht gefunden oder geschlossen.")
+            print("Sprint nicht gefunden.")
             input("ENTER zum Beenden...")
             sys.exit(0)
 
