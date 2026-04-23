@@ -4,163 +4,178 @@
 """
 ===============================================================================
 Datei        : jira_subtask_creator.py
-Version      : V0.3
+Version      : V0.4
 Autor        : ChatGPT
 
 ===============================================================================
-BESCHREIBUNG
+ZWECK DES PROGRAMMS
 ===============================================================================
 
-Dieses Python-Programm verbindet sich mit Atlassian Jira Cloud über die REST API
-und erstellt automatisch Unteraufgaben (Subtasks) für Issues eines angegebenen
-Sprints.
+Dieses Python-Programm automatisiert das Erstellen von Jira Subtasks für
+Issues innerhalb eines ausgewählten Sprints in Jira Cloud.
 
-Die anzulegenden Unteraufgaben werden aus Textdateien im Unterordner:
+Es verbindet sich über die Jira REST API und analysiert alle Issues eines
+Sprints. Basierend auf Labels in den Issues werden definierte Unteraufgaben
+(Subtasks) automatisch erzeugt.
+
+===============================================================================
+GRUNDPRINZIP
+===============================================================================
+
+1. Sprint wird ausgewählt (manuell oder über Filtermodus)
+2. Alle Issues im Sprint werden geladen
+3. Für jedes Issue werden Labels ausgewertet
+4. Passende Subtask-Definitionen werden aus Dateien geladen
+5. Fehlende Subtasks werden automatisch erstellt
+6. Bestehende Subtasks werden ignoriert
+7. Abschlussbericht wird ausgegeben
+
+===============================================================================
+SUBTASK-DEFINITIONEN
+===============================================================================
+
+Pfad:
 
     ./Subtasks/
 
-geladen.
+Dateibenennung:
+
+    Subtasks_<LABEL>.txt
 
 Beispiele:
 
-    Subtasks/Subtasks_Impl.txt
-    Subtasks/Subtasks_Test.txt
-    Subtasks/Subtasks_Spez.txt
+    Subtasks_Impl.txt   -> Label "Impl"
+    Subtasks_Test.txt   -> Label "Test"
+    Subtasks_Spez.txt   -> Label "Spez"
 
-Der Dateiname definiert das benötigte Label.
-
-Beispiel:
-
-    Subtasks_Impl.txt
-
-=> Alle Issues im Sprint mit dem Label:
-
-    Impl
-
-erhalten die darin definierten Unteraufgaben.
-
-===============================================================================
-UNTERSTÜTZTE ISSUE-TYPEN
-===============================================================================
-
-Es werden alle normalen Sprint-Issues berücksichtigt, z.B.:
-
-- Story
-- Task
-- Bug
-- Epic (falls im Sprint)
-- Eigene Custom Typen
-
-Bereits vorhandene Subtasks werden erkannt.
-
-Reine Subtasks selbst werden NICHT separat verarbeitet und NICHT separat in der
-Ergebnisübersicht angezeigt.
-
-===============================================================================
-FUNKTIONEN
-===============================================================================
-
-✔ Jira Cloud Search API (/rest/api/3/search/jql)
-✔ Sprint darf aktiv / geplant / backlog sein
-✔ Mehrere Label-Dateien möglich
-✔ Vorhandene Unteraufgaben erkennen
-✔ Keine doppelten Unteraufgaben erstellen
-✔ Pagination für große Sprints
-✔ Dry-Run Modus
-✔ Abschlussübersicht je Haupt-Issue
-
-===============================================================================
-VERZEICHNISSTRUKTUR
-===============================================================================
-
-jira_subtask_creator.py
-confluence_login.txt
-Subtasks/
-    Subtasks_Impl.txt
-    Subtasks_Test.txt
-    Subtasks_Spez.txt
-
-===============================================================================
-DATEI: confluence_login.txt
-===============================================================================
-
-Die Datei muss im gleichen Verzeichnis liegen.
-
-Inhalt (3 Zeilen):
-
-    https://deinfirma.atlassian.net
-    deine.mail@firma.de
-    API_TOKEN
-
-Zeile 1 = Jira URL
-Zeile 2 = Login Mailadresse
-Zeile 3 = Atlassian API Token
-
-API Token erstellen:
-
-https://id.atlassian.com/manage-profile/security/api-tokens
-
-===============================================================================
-DATEI: Subtasks/Subtasks_Impl.txt
-===============================================================================
-
-Eine Zeile = ein Unteraufgaben-Titel
+Inhalt:
+    Eine Zeile = ein Subtask Titel
 
 Beispiel:
 
-    Code erstellen
-    Unit Test erstellen
+    Architektur prüfen
+    Unit Tests schreiben
+    Code implementieren
     Review durchführen
 
 ===============================================================================
-VERWENDUNG
+JIRA LOGIN DATEI
 ===============================================================================
 
-Normal starten:
+Datei:
+
+    confluence_login.txt
+
+Format (3 Zeilen):
+
+    https://deine-domain.atlassian.net
+    email@domain.com
+    API_TOKEN
+
+===============================================================================
+SPRINT AUSWAHL MODI
+===============================================================================
+
+----------------------------
+1) Standardmodus (exakte Eingabe)
+----------------------------
+
+Aufruf:
 
     python jira_subtask_creator.py
 
-Dry Run (nur anzeigen, nichts erstellen):
+Dann Eingabe:
 
-    python jira_subtask_creator.py --dry-run
+    Sprint Name exakt wie in Jira
 
-Danach Sprintnamen eingeben:
+Verhalten:
+- Sprint muss exakt existieren
+- Wenn nicht gefunden → Abbruch mit Fehlermeldung
 
-    Sprint Team 2
+----------------------------
+2) Filtermodus (-f / --filter)
+----------------------------
+
+Aufruf:
+
+    python jira_subtask_creator.py --filter
+    python jira_subtask_creator.py -f
+
+ODER mit Filterstring:
+
+    python jira_subtask_creator.py -f "Team 2"
+
+Verhalten:
+- lädt alle Sprints aus Jira Boards
+- optional Filter auf Sprintnamen
+- zeigt nummerierte Liste
+- Nutzer wählt Sprint per Zahl
 
 ===============================================================================
-ERGEBNISÜBERSICHT
+NEUE FUNKTIONEN IN V0.4
 ===============================================================================
 
-Für jedes Haupt-Issue wird angezeigt:
+✔ Sprint-Auswahl über Jira Agile API
+✔ Filtermodus für Sprintauswahl
+✔ Sprint-Suche über Boards
+✔ Exakte Sprintvalidierung im Standardmodus
+✔ Verbesserte Benutzerführung
+✔ stabile Issue-Erkennung (nur Haupt-Issues)
+✔ Subtasks werden nicht separat verarbeitet
 
-- Welche Unteraufgaben erstellt wurden
-- Welche bereits vorhanden waren
-- Welche übersprungen wurden
+===============================================================================
+JIRA API VERWENDET
+===============================================================================
 
-Subtasks selbst erscheinen NICHT als eigener Eintrag.
+- /rest/api/3/search/jql
+- /rest/agile/1.0/board
+- /rest/agile/1.0/board/{boardId}/sprint
+
+===============================================================================
+VERHALTEN BEI FEHLERN
+===============================================================================
+
+- Kein Sprint gefunden → Programm beendet sich sauber
+- API Fehler → Ausgabe des HTTP Fehlers
+- Ungültige Auswahl → erneute Eingabe
+
+===============================================================================
+ABHÄNGIGKEITEN
+===============================================================================
+
+Python Pakete:
+
+    requests
+
+Installation:
+
+    pip install requests
 
 ===============================================================================
 CHANGELOG
 ===============================================================================
 
 V0.0
-- Erstversion
+- Initialversion
 
 V0.1
-- Mehrere Definitionsdateien
-- Labels statt Summary Text
-- Alle Issue Typen
+- Label-System eingeführt
+- mehrere Subtask-Dateien unterstützt
 
 V0.2
-- Neue Jira Search API
+- Jira Search API aktualisiert
 - Pagination
 - Dry Run
-- Verbesserte Fehlerbehandlung
 
 V0.3
-- Subtasks werden nicht mehr separat in Übersicht angezeigt
-- Nur Haupt-Issues werden verarbeitet
+- Subtasks aus Ausgabe entfernt
+- nur Haupt-Issues verarbeitet
+
+V0.4
+- Sprint-Filtermodus (-f / --filter)
+- Sprintliste aus Jira Boards
+- exakte Sprintvalidierung
+- verbesserte Benutzerführung
 
 ===============================================================================
 """
@@ -177,16 +192,16 @@ SUBTASK_DIR = "Subtasks"
 
 
 # ============================================================================
-# HILFSFUNKTIONEN
+# LOGIN
 # ============================================================================
 
 def read_login():
-    """Liest Login-Datei ein."""
+    """Liest Jira Login-Daten aus Datei."""
     if not os.path.exists(LOGIN_FILE):
         sys.exit(f"Fehler: {LOGIN_FILE} nicht gefunden.")
 
     with open(LOGIN_FILE, "r", encoding="utf-8") as f:
-        lines = [x.strip() for x in f.readlines() if x.strip()]
+        lines = [l.strip() for l in f.readlines() if l.strip()]
 
     if len(lines) < 3:
         sys.exit("Fehler: confluence_login.txt benötigt 3 Zeilen.")
@@ -194,14 +209,17 @@ def read_login():
     return lines[0], lines[1], lines[2]
 
 
+# ============================================================================
+# SUBTASK DEFINITIONS
+# ============================================================================
+
 def load_subtask_definitions():
     """
-    Lädt alle Dateien:
-        Subtasks/Subtasks_*.txt
+    Lädt Subtask Definitionen aus ./Subtasks
 
     Rückgabe:
         {
-            "Impl": ["Code erstellen", "Review"],
+            "Impl": ["Task1", "Task2"],
             "Test": [...]
         }
     """
@@ -213,22 +231,23 @@ def load_subtask_definitions():
     files = glob.glob(os.path.join(SUBTASK_DIR, "Subtasks_*.txt"))
 
     for file in files:
-        filename = os.path.basename(file)
-
-        label = filename.replace("Subtasks_", "").replace(".txt", "").strip()
+        name = os.path.basename(file)
+        label = name.replace("Subtasks_", "").replace(".txt", "")
 
         with open(file, "r", encoding="utf-8") as f:
-            tasks = [x.strip() for x in f.readlines() if x.strip()]
+            tasks = [l.strip() for l in f.readlines() if l.strip()]
 
-        if tasks:
-            # doppelte Einträge entfernen
-            result[label] = list(dict.fromkeys(tasks))
+        result[label] = list(dict.fromkeys(tasks))
 
     return result
 
 
+# ============================================================================
+# JIRA HTTP
+# ============================================================================
+
 def jira_get(base_url, auth, endpoint, params=None):
-    """HTTP GET an Jira."""
+    """GET Request Jira API"""
     r = requests.get(base_url + endpoint, auth=auth, params=params)
 
     if not r.ok:
@@ -238,7 +257,7 @@ def jira_get(base_url, auth, endpoint, params=None):
 
 
 def jira_post(base_url, auth, endpoint, payload):
-    """HTTP POST an Jira."""
+    """POST Request Jira API"""
     r = requests.post(
         base_url + endpoint,
         auth=auth,
@@ -253,19 +272,99 @@ def jira_post(base_url, auth, endpoint, payload):
 
 
 # ============================================================================
-# JIRA FUNKTIONEN
+# SPRINT HANDLING
+# ============================================================================
+
+def fetch_all_sprints(base_url, auth):
+    """
+    Lädt alle Sprints aus allen Boards.
+    """
+    boards = jira_get(base_url, auth, "/rest/agile/1.0/board")["values"]
+
+    sprints = []
+
+    for board in boards:
+        board_id = board["id"]
+
+        start_at = 0
+        while True:
+            data = jira_get(
+                base_url,
+                auth,
+                f"/rest/agile/1.0/board/{board_id}/sprint",
+                {"startAt": start_at, "maxResults": 50}
+            )
+
+            values = data.get("values", [])
+            sprints.extend(values)
+
+            if data.get("isLast", True):
+                break
+
+            start_at += 50
+
+    # eindeutige Sprints nach Name
+    unique = {}
+    for s in sprints:
+        unique[s["name"]] = s
+
+    return list(unique.values())
+
+
+def select_sprint_filtered(base_url, auth, filter_string=None):
+    """
+    Interaktive Sprintauswahl mit optionalem Filter.
+    """
+    sprints = fetch_all_sprints(base_url, auth)
+
+    if filter_string:
+        sprints = [
+            s for s in sprints
+            if filter_string.lower() in s["name"].lower()
+        ]
+
+    if not sprints:
+        print("Keine passenden Sprints gefunden.")
+        sys.exit(0)
+
+    print("\nVerfügbare Sprints:\n")
+
+    for i, s in enumerate(sprints, 1):
+        print(f"{i}. {s['name']}")
+
+    while True:
+        try:
+            idx = int(input("\nSprint auswählen (Nummer): "))
+            if 1 <= idx <= len(sprints):
+                return sprints[idx - 1]["name"]
+        except ValueError:
+            pass
+
+        print("Ungültige Auswahl.")
+
+
+def validate_exact_sprint(base_url, auth, sprint_name):
+    """
+    Prüft exakte Übereinstimmung eines Sprints.
+    """
+    sprints = fetch_all_sprints(base_url, auth)
+
+    return any(s["name"] == sprint_name for s in sprints)
+
+
+# ============================================================================
+# ISSUES
 # ============================================================================
 
 def search_issues_in_sprint(base_url, auth, sprint_name):
     """
-    Lädt alle Issues des angegebenen Sprints mit Pagination.
+    Lädt alle Issues eines Sprints (Pagination).
     """
     start_at = 0
     max_results = 100
-    all_issues = []
+    issues = []
 
     while True:
-
         params = {
             "jql": f'sprint = "{sprint_name}" ORDER BY key',
             "startAt": start_at,
@@ -275,46 +374,30 @@ def search_issues_in_sprint(base_url, auth, sprint_name):
 
         data = jira_get(base_url, auth, "/rest/api/3/search/jql", params)
 
-        issues = data.get("issues", [])
-        all_issues.extend(issues)
+        batch = data.get("issues", [])
+        issues.extend(batch)
 
-        if len(issues) < max_results:
+        if len(batch) < max_results:
             break
 
         start_at += max_results
 
-    return all_issues
+    return issues
 
 
 def is_subtask(issue):
-    """
-    Erkennt, ob Issue selbst ein Subtask ist.
-    """
-    fields = issue["fields"]
-
-    if fields.get("parent"):
-        return True
-
-    issuetype = fields.get("issuetype", {})
-    return issuetype.get("subtask", False)
+    """Erkennt Subtasks und filtert sie aus."""
+    return bool(issue["fields"].get("parent"))
 
 
 def create_subtask(base_url, auth, issue, title):
-    """
-    Erstellt Unteraufgabe.
-    """
+    """Erstellt Jira Subtask."""
     payload = {
         "fields": {
-            "project": {
-                "key": issue["fields"]["project"]["key"]
-            },
-            "parent": {
-                "key": issue["key"]
-            },
+            "project": {"key": issue["fields"]["project"]["key"]},
+            "parent": {"key": issue["key"]},
             "summary": title,
-            "issuetype": {
-                "name": "Sub-task"
-            }
+            "issuetype": {"name": "Sub-task"}
         }
     }
 
@@ -328,64 +411,54 @@ def create_subtask(base_url, auth, issue, title):
 def main():
 
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Nur anzeigen, nichts erstellen"
-    )
-
+    parser.add_argument("-f", "--filter", nargs="?", const="")
     args = parser.parse_args()
 
-    print("Jira Subtask Creator V0.3")
+    print("Jira Subtask Creator V0.4")
     print("-------------------------")
-
-    if args.dry_run:
-        print("DRY RUN aktiv - keine Änderungen werden durchgeführt.\n")
-
-    sprint = input("Sprintname eingeben: ").strip()
-
-    if not sprint:
-        print("Abbruch.")
-        return
 
     base_url, user, token = read_login()
     auth = HTTPBasicAuth(user, token)
 
     definitions = load_subtask_definitions()
 
-    print("\nGefundene Regeln:")
+    # ------------------------------------------------------------------------
+    # Sprint Auswahl
+    # ------------------------------------------------------------------------
 
-    for label, tasks in definitions.items():
-        print(f"  {label}: {len(tasks)} Einträge")
+    if args.filter is not None:
+        sprint_name = select_sprint_filtered(base_url, auth, args.filter)
+    else:
+        sprint_name = input("Sprintname (exakt) eingeben: ").strip()
 
-    print("\nLade Sprint Issues...")
+        if not validate_exact_sprint(base_url, auth, sprint_name):
+            print("Fehler: Kein exakt passender Sprint gefunden.")
+            sys.exit(0)
 
-    try:
-        issues = search_issues_in_sprint(base_url, auth, sprint)
-    except Exception as e:
-        print(f"\nFehler beim Laden: {e}")
-        return
+    print(f"\nVerwendeter Sprint: {sprint_name}")
 
-    # Nur Haupt-Issues behalten
-    issues = [x for x in issues if not is_subtask(x)]
+    # ------------------------------------------------------------------------
+    # Issues laden
+    # ------------------------------------------------------------------------
 
-    print(f"{len(issues)} Haupt-Issues gefunden.")
+    print("Lade Issues...")
+
+    issues = search_issues_in_sprint(base_url, auth, sprint_name)
+    issues = [i for i in issues if not is_subtask(i)]
+
+    print(f"{len(issues)} Haupt-Issues gefunden.\n")
 
     report = []
 
     for issue in issues:
 
-        key = issue["key"]
         fields = issue["fields"]
-
-        issue_type = fields["issuetype"]["name"]
-        summary = fields["summary"]
         labels = fields.get("labels", [])
 
-        existing = set()
-
-        for sub in fields.get("subtasks", []):
-            existing.add(sub["fields"]["summary"])
+        existing = {
+            s["fields"]["summary"]
+            for s in fields.get("subtasks", [])
+        }
 
         created = []
         skipped = []
@@ -401,51 +474,41 @@ def main():
                     skipped.append(task)
                     continue
 
-                if args.dry_run:
-                    created.append(task + " [DRY RUN]")
-                    existing.add(task)
-                    continue
-
                 try:
                     create_subtask(base_url, auth, issue, task)
                     created.append(task)
                     existing.add(task)
-
                 except Exception:
-                    skipped.append(task + " [Fehler]")
+                    skipped.append(task)
 
         report.append({
-            "key": key,
-            "type": issue_type,
-            "summary": summary,
+            "key": issue["key"],
+            "type": fields["issuetype"]["name"],
+            "summary": fields["summary"],
             "created": created,
             "skipped": skipped
         })
 
-    # ========================================================================
-    # AUSGABE
-    # ========================================================================
+    # ------------------------------------------------------------------------
+    # OUTPUT
+    # ------------------------------------------------------------------------
 
     print("\n" + "=" * 72)
     print("ERGEBNISÜBERSICHT")
     print("=" * 72)
 
-    for item in report:
+    for r in report:
+        print(f"\n{r['key']} [{r['type']}] {r['summary']}")
 
-        print(f"\n{item['key']} [{item['type']}] {item['summary']}")
-
-        if item["created"]:
+        if r["created"]:
             print("  Erstellt:")
-            for x in item["created"]:
-                print(f"    + {x}")
+            for c in r["created"]:
+                print(f"    + {c}")
 
-        if item["skipped"]:
-            print("  Bereits vorhanden / übersprungen:")
-            for x in item["skipped"]:
-                print(f"    - {x}")
-
-        if not item["created"] and not item["skipped"]:
-            print("  Keine Aktion.")
+        if r["skipped"]:
+            print("  Übersprungen:")
+            for s in r["skipped"]:
+                print(f"    - {s}")
 
     print("\nFertig.")
 
