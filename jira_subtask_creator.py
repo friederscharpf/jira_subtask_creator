@@ -34,6 +34,8 @@ GRUNDLOGIK
    - oder über Filtermodus (-f / --filter)
 
 2. Sprint wird validiert (inkl. Statusprüfung)
+   - nur active und future erlaubt
+   - closed wird blockiert
 
 3. Alle Issues im Sprint werden geladen
 
@@ -45,7 +47,7 @@ GRUNDLOGIK
 
 7. Bereits vorhandene Subtasks werden übersprungen
 
-8. Abschlussbericht wird ausgegeben
+8. Ergebnisbericht wird ausgegeben
 
 ===============================================================================
 SUBTASK-DEFINITIONEN
@@ -87,20 +89,32 @@ SPRINT VERHALTEN
 Standardmodus
 -------------------------------------------------
 
-- Sprintname wird exakt eingegeben
-- Sprint muss existieren
-- Sprint darf NICHT geschlossen sein
-- leerer Input beendet Programm
+Aufruf:
+
+    python jira_subtask_creator.py
+
+Verhalten:
+
+- Sprintname muss exakt eingegeben werden
+- ENTER = Exit
+- closed Sprint wird blockiert
+- active/future erlaubt
 
 -------------------------------------------------
 Filtermodus (-f / --filter)
 -------------------------------------------------
+Aufruf:
 
-- zeigt Sprintliste
-- Filter optional
-- geschlossene Sprints werden NICHT angezeigt
+    -f
+    -f ""
+    -f "Team 2"
+
+VERHALTEN:
+
+- zeigt ALLE active + future Sprints (geschlossene Sprints werden nicht angezeigt)
+- optional Filterstring möglich
 - Auswahl per Nummer
-- ENTER beendet Programm
+- ENTER = Exit
 
 ===============================================================================
 DRY RUN
@@ -108,9 +122,9 @@ DRY RUN
 
 --dry-run:
 
+- Simulation
 - keine Änderungen in Jira
-- nur Simulation
-- gleiche Ausgabe wie produktiv
+- gleiche Ausgabe wie produktiv mit vollständigem Report
 
 ===============================================================================
 NEUERUNG V0.7
@@ -139,7 +153,7 @@ V0.2  Search API + Dry Run
 V0.3  Subtask Filterung
 V0.4  Sprint Filtermodus
 V0.5  Stabilisierung + Dry Run fix
-V0.6  Help + Exit Handling + Closed Sprint Handling
+V0.6  Closed Sprint Handling + Messages
 V0.7  Explizite Closed-Sprint Meldung vor Verarbeitung
 
 ===============================================================================
@@ -176,8 +190,8 @@ Optionen:
   -h, --help            Hilfe anzeigen
 
 Wichtige Regeln:
-  - geschlossene Sprints werden abgelehnt
-  - bei geschlossenem Sprint werden KEINE Subtasks erstellt
+  - nur active und future Sprints erlaubt (closed Sprints werden abgelehnt)
+  - Subtasks werden nur bei active und future Sprints erstellt
   - leere Eingaben beenden das Programm
 """)
     input("\nENTER zum Beenden...")
@@ -211,8 +225,7 @@ def load_subtask_definitions():
     files = glob.glob(os.path.join(SUBTASK_DIR, "Subtasks_*.txt"))
 
     for file in files:
-        name = os.path.basename(file)
-        label = name.replace("Subtasks_", "").replace(".txt", "")
+        label = os.path.basename(file).replace("Subtasks_", "").replace(".txt", "")
 
         with open(file, "r", encoding="utf-8") as f:
             tasks = [l.strip() for l in f.readlines() if l.strip()]
@@ -283,6 +296,8 @@ def fetch_all_sprints(base_url, auth):
 def is_closed_sprint(sprint):
     return sprint.get("state", "").lower() == "closed"
 
+def sprint_label(s):
+    return f"{s['name']} ({s.get('state','')})"
 
 def select_sprint_filtered(base_url, auth, filter_string=None):
     sprints = fetch_all_sprints(base_url, auth)
@@ -293,14 +308,14 @@ def select_sprint_filtered(base_url, auth, filter_string=None):
         sprints = [s for s in sprints if filter_string.lower() in s["name"].lower()]
 
     if not sprints:
-        print("Keine offenen Sprints gefunden.")
+        print("Keine offenen/aktiven Sprints gefunden.")
         input("ENTER zum Beenden...")
         sys.exit(0)
 
-    print("\nVerfügbare offene Sprints:\n")
+    print("\nVerfügbare offene/aktive Sprints:\n")
 
     for i, s in enumerate(sprints, 1):
-        print(f"{i}. {s['name']}")
+        print(f"{i}. {sprint_label(s)}")
 
     while True:
         choice = input("\nSprint auswählen (ENTER = Abbruch): ").strip()
@@ -393,7 +408,7 @@ def create_subtask(base_url, auth, issue, title):
 def main():
 
     parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument("-f", "--filter", nargs="?", const=None)
+    parser.add_argument("-f", "--filter", nargs="?", const="")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("-h", "--help", action="store_true")
 
@@ -413,7 +428,7 @@ def main():
     if args.filter is not None:
         sprint_name = select_sprint_filtered(base_url, auth, args.filter)
     else:
-        sprint_name = input("Sprintname (exakt, ENTER = Abbruch): ").strip()
+        sprint_name = input("Sprintname (exakt, ENTER = Beenden): ").strip()
 
         if sprint_name == "":
             print("Programm wird beendet.")
@@ -432,7 +447,7 @@ def main():
     issues = search_issues_in_sprint(base_url, auth, sprint_name)
     issues = [i for i in issues if not is_subtask(i)]
 
-    print(f"{len(issues)} Haupt-Issues gefunden.\n")
+    print(f"{len(issues)} Issues gefunden.\n")
 
     report = []
 
@@ -441,13 +456,9 @@ def main():
         fields = issue["fields"]
         labels = fields.get("labels", [])
 
-        existing = {
-            s["fields"]["summary"]
-            for s in fields.get("subtasks", [])
-        }
+        existing = {s["fields"]["summary"] for s in fields.get("subtasks", [])}
 
-        created = []
-        skipped = []
+        created, skipped = [], []
 
         for label in labels:
 
@@ -480,7 +491,7 @@ def main():
         })
 
     print("\n" + "=" * 72)
-    print("ERGEBNISÜBERSICHT")
+    print("REPORT")
     print("=" * 72)
 
     for r in report:
