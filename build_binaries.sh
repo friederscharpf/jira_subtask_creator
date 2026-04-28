@@ -93,6 +93,13 @@ Besonderheiten:
   - Falls Docker nur mit sudo nutzbar ist, verwendet das Script automatisch sudo docker.
   - Falls chmod ohne sudo fehlschlägt, verwendet das Script automatisch sudo chmod.
   - Falls ${LINUX_DOCKERFILE} oder ${WINDOWS_DOCKERFILE} fehlen, werden sie automatisch erzeugt.
+  - Falls vorhandene Dockerfiles nicht exakt dem erwarteten Inhalt entsprechen,
+    werden sie gesichert und anschließend korrekt neu erzeugt.
+  - Backups werden nicht überschrieben:
+      Dockerfile.linux_bu
+      Dockerfile.linux_bu1
+      Dockerfile.linux_bu2
+      ...
   - Docker Build Cache wird genutzt, solange Docker ihn nicht selbst invalidiert.
 EOF
 }
@@ -165,18 +172,28 @@ safe_chmod_x() {
 
 
 # =============================================================================
-# DOCKERFILE GENERATION
+# DOCKERFILE BACKUP / VALIDATION
 # =============================================================================
 
-create_linux_dockerfile_if_missing() {
-    if [ -f "$LINUX_DOCKERFILE" ]; then
-        info "$LINUX_DOCKERFILE vorhanden."
-        return
-    fi
+backup_file_without_overwrite() {
+    local file="$1"
+    local backup="${file}_bu"
+    local counter=0
 
-    warn "$LINUX_DOCKERFILE fehlt und wird erzeugt."
+    while [ -e "$backup" ]; do
+        counter=$((counter + 1))
+        backup="${file}_bu${counter}"
+    done
 
-    cat > "$LINUX_DOCKERFILE" <<'EOF'
+    mv "$file" "$backup"
+    warn "Vorhandenes Dockerfile wurde gesichert als: $backup"
+}
+
+
+write_expected_linux_dockerfile() {
+    local target="$1"
+
+    cat > "$target" <<'EOF'
 FROM python:3.12-slim
 
 WORKDIR /build
@@ -196,59 +213,81 @@ RUN pyinstaller \
 
 CMD ["bash"]
 EOF
-
-    ok "$LINUX_DOCKERFILE erzeugt."
 }
 
 
-create_windows_dockerfile_if_missing() {
-    if [ -f "$WINDOWS_DOCKERFILE" ]; then
-        info "$WINDOWS_DOCKERFILE vorhanden."
-        return
-    fi
+write_expected_windows_dockerfile() {
+    local target="$1"
 
-    warn "$WINDOWS_DOCKERFILE fehlt und wird erzeugt."
+    cat > "$target" <<'EOF'
+FROM cdrx/pyinstaller-windows:python3
 
-    cat > "$WINDOWS_DOCKERFILE" <<'EOF'
-FROM debian:bookworm-slim
-
-ENV DEBIAN_FRONTEND=noninteractive
-ENV WINEDEBUG=-all
-ENV WINEPREFIX=/wine
-
-WORKDIR /build
-
-RUN dpkg --add-architecture i386 && \
-    apt-get update && apt-get install -y --no-install-recommends \
-    wine \
-    wine32 \
-    wine64 \
-    wget \
-    ca-certificates \
-    xvfb \
-    xauth \
-    cabextract \
-    unzip \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN wget -O python-installer.exe https://www.python.org/ftp/python/3.12.4/python-3.12.4-amd64.exe && \
-    xvfb-run wine python-installer.exe /quiet InstallAllUsers=1 PrependPath=1 Include_test=0 && \
-    rm python-installer.exe
-
-RUN xvfb-run wine python -m pip install --upgrade pip && \
-    xvfb-run wine python -m pip install pyinstaller requests
+WORKDIR /src
 
 COPY jira_subtask_creator.py .
 
-RUN xvfb-run wine pyinstaller \
+RUN python -m pip install requests==2.31.0
+
+RUN pyinstaller \
     --onefile \
     --name jira_subtask_creator \
     jira_subtask_creator.py
 
 CMD ["bash"]
 EOF
+}
 
-    ok "$WINDOWS_DOCKERFILE erzeugt."
+
+ensure_dockerfile_exact() {
+    local dockerfile="$1"
+    local type="$2"
+    local tmp_expected
+
+    tmp_expected="$(mktemp)"
+
+    if [ "$type" = "linux" ]; then
+        write_expected_linux_dockerfile "$tmp_expected"
+    elif [ "$type" = "windows" ]; then
+        write_expected_windows_dockerfile "$tmp_expected"
+    else
+        rm -f "$tmp_expected"
+        error "Interner Fehler: unbekannter Dockerfile-Typ '$type'"
+        exit 1
+    fi
+
+    if [ ! -f "$dockerfile" ]; then
+        warn "$dockerfile fehlt und wird erzeugt."
+        cp "$tmp_expected" "$dockerfile"
+        rm -f "$tmp_expected"
+        ok "$dockerfile erzeugt."
+        return
+    fi
+
+    if cmp -s "$dockerfile" "$tmp_expected"; then
+        info "$dockerfile vorhanden und exakt korrekt."
+        rm -f "$tmp_expected"
+        return
+    fi
+
+    warn "$dockerfile existiert, entspricht aber nicht dem erwarteten Inhalt."
+    backup_file_without_overwrite "$dockerfile"
+    cp "$tmp_expected" "$dockerfile"
+    rm -f "$tmp_expected"
+    ok "$dockerfile wurde korrekt neu erzeugt."
+}
+
+
+# =============================================================================
+# DOCKERFILE GENERATION
+# =============================================================================
+
+create_linux_dockerfile_if_missing_or_wrong() {
+    ensure_dockerfile_exact "$LINUX_DOCKERFILE" "linux"
+}
+
+
+create_windows_dockerfile_if_missing_or_wrong() {
+    ensure_dockerfile_exact "$WINDOWS_DOCKERFILE" "windows"
 }
 
 
@@ -262,7 +301,7 @@ build_linux() {
     echo "Erzeuge Linux Binary"
     echo "========================================"
 
-    create_linux_dockerfile_if_missing
+    create_linux_dockerfile_if_missing_or_wrong
 
     mkdir -p "$OUT_LINUX"
 
@@ -291,7 +330,7 @@ build_windows() {
     echo "Erzeuge Windows EXE"
     echo "========================================"
 
-    create_windows_dockerfile_if_missing
+    create_windows_dockerfile_if_missing_or_wrong
 
     mkdir -p "$OUT_WINDOWS"
 
@@ -305,7 +344,7 @@ build_windows() {
     info "EXE aus Container extrahieren..."
     container_id="$($DOCKER_CMD create "$WINDOWS_IMAGE")"
 
-    $DOCKER_CMD cp "$container_id:/build/dist/${APP_NAME}.exe" "$OUT_WINDOWS/${APP_NAME}.exe"
+    $DOCKER_CMD cp "$container_id:/src/dist/${APP_NAME}.exe" "$OUT_WINDOWS/${APP_NAME}.exe"
     $DOCKER_CMD rm "$container_id" >/dev/null
 
     ok "Windows EXE erstellt: $OUT_WINDOWS/${APP_NAME}.exe"
