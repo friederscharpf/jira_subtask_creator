@@ -91,6 +91,7 @@ Voraussetzungen:
 
 Besonderheiten:
   - Falls Docker nur mit sudo nutzbar ist, verwendet das Script automatisch sudo docker.
+  - Falls chmod ohne sudo fehlschlägt, verwendet das Script automatisch sudo chmod.
   - Falls ${LINUX_DOCKERFILE} oder ${WINDOWS_DOCKERFILE} fehlen, werden sie automatisch erzeugt.
   - Docker Build Cache wird genutzt, solange Docker ihn nicht selbst invalidiert.
 EOF
@@ -141,6 +142,25 @@ check_source_file() {
         error "${APP_NAME}.py wurde im aktuellen Verzeichnis nicht gefunden."
         exit 1
     fi
+}
+
+
+safe_chmod_x() {
+    local target_file="$1"
+
+    if chmod +x "$target_file" >/dev/null 2>&1; then
+        return
+    fi
+
+    if command -v sudo >/dev/null 2>&1 && sudo chmod +x "$target_file" >/dev/null 2>&1; then
+        warn "chmod wurde mit sudo ausgeführt: $target_file"
+        return
+    fi
+
+    error "Konnte Datei nicht ausführbar machen: $target_file"
+    echo "Bitte manuell ausführen:"
+    echo "  sudo chmod +x \"$target_file\""
+    exit 1
 }
 
 
@@ -206,6 +226,7 @@ RUN dpkg --add-architecture i386 && \
     wget \
     ca-certificates \
     xvfb \
+    xauth \
     cabextract \
     unzip \
     && rm -rf /var/lib/apt/lists/*
@@ -258,7 +279,7 @@ build_linux() {
     $DOCKER_CMD cp "$container_id:/build/dist/${APP_NAME}" "$OUT_LINUX/${APP_NAME}"
     $DOCKER_CMD rm "$container_id" >/dev/null
 
-    chmod +x "$OUT_LINUX/${APP_NAME}"
+    safe_chmod_x "$OUT_LINUX/${APP_NAME}"
 
     ok "Linux Binary erstellt: $OUT_LINUX/${APP_NAME}"
 }
