@@ -3,6 +3,8 @@
 **Hinweis:** Diese README ist zuerst auf Deutsch geschrieben. Die englische Version mit gleichem Inhalt befindet sich weiter unten.  
 **Note:** This README is written in German first. The English version with the same content is provided below.
 
+**DISCLAIMER:** This script was mainly created from ChatGPT. Please use with care! In case of any doubts about security reasons please check source code first or do not use this script.
+
 ---
 
 # Deutsch
@@ -173,7 +175,7 @@ bin/windows/jira_subtask_creator.exe
 
 ## Lizenz
 
-Bitte bei Bedarf projektspezifisch ergänzen.
+Dieses Projekt unterliegt der Apache-Lizenz 2.0. Weitere Informationen finden Sie in der Datei „LICENSE“.
 
 ---
 
@@ -345,4 +347,4 @@ bin/windows/jira_subtask_creator.exe
 
 ## License
 
-Please add project-specific license information if needed.
+This project is licensed under the Apache License 2.0. See the LICENSE file for details.
