@@ -8,7 +8,7 @@ import argparse
 import requests
 from requests.auth import HTTPBasicAuth
 
-APP_VERSION = "V1.0"
+APP_VERSION = "V1.1"
 
 DOCUMENTATION = f"""
 ===============================================================================
@@ -39,8 +39,10 @@ GRUNDLOGIK
 ===============================================================================
 
 1. Sprint wird ausgewählt:
-   - manuell (exakte Eingabe)
-   - oder über Filtermodus (-f / --filter)
+   - über Menü
+   - manuell per exakter Eingabe
+   - über Filtermodus (-f / --filter)
+   - direkt per Parameter (-s / --sprint)
 
 2. Sprint wird validiert (inkl. Statusprüfung)
    - nur active und future erlaubt
@@ -57,6 +59,10 @@ GRUNDLOGIK
 7. Bereits vorhandene Subtasks werden übersprungen
 
 8. Ergebnisbericht wird ausgegeben
+
+9. Vor Programmende muss der Benutzer mit ENTER bestätigen.
+   Das gilt auch für Fehlerfälle, damit sich ein Windows-Konsolenfenster beim
+   Start per Doppelklick nicht sofort schließt.
 
 ===============================================================================
 SUBTASK-DEFINITIONEN
@@ -128,57 +134,34 @@ Wichtig:
 TOKEN / RECHTE / SCOPES
 ===============================================================================
 
-Hinweis zu scoped API Tokens:
-
-Für dieses Tool wird aktuell ein klassischer / unscoped Atlassian API Token
-empfohlen, da die verwendete Jira Software Agile API
-/rest/agile/1.0/board und /rest/agile/1.0/board/{id}/sprint mit scoped API
-Tokens je nach Atlassian Cloud Umgebung mit 401 fehlschlagen kann.
-
-Wenn ein scoped Token verwendet wird und der Fehler
-"401: Client must be authenticated to access this resource" beim Zugriff auf
-/rest/agile/1.0/board erscheint, sollte ein klassischer API Token verwendet
-werden.
-
-
-Scoped Token:
-
-Das Programm benötigt keinen API Token mit Vollzugriff, wenn ein Token mit
-Scopes verwendet wird.
-
-Benötigt werden mindestens Rechte zum:
+Das Programm benötigt Rechte zum:
 
 1. Lesen von Boards und Sprints
 2. Suchen und Lesen von Jira Issues
 3. Erstellen von Issues / Subtasks
 
-Empfohlene klassische Jira Scopes:
+Hinweis zu Atlassian API Tokens:
 
-    read:jira-work
-    write:jira-work
-    read:jira-user
+Für dieses Tool wird aktuell ein klassischer / unscoped Atlassian API Token
+empfohlen, da die verwendete Jira Software Agile API:
 
-Bei granularen Jira / Jira Software Scopes können zusätzlich bzw. alternativ
-folgende Berechtigungen nötig sein:
+    /rest/agile/1.0/board
+    /rest/agile/1.0/board/{{id}}/sprint
 
-    read:board-scope:jira-software
-    read:sprint:jira-software
-    read:issue-details:jira
-    read:project:jira
-    write:issue:jira
+mit scoped API Tokens je nach Atlassian Cloud Umgebung mit Fehlern wie:
 
-Zusätzlich muss der Jira Benutzer, zu dem der API Token gehört, im jeweiligen
-Projekt ausreichende Jira-Projektrechte besitzen:
+    401: Client must be authenticated to access this resource
+
+fehlschlagen kann, obwohl scheinbar passende Scopes gesetzt wurden.
+
+Bei einem klassischen API Token muss zusätzlich der Jira Benutzer, zu dem der
+API Token gehört, im jeweiligen Projekt ausreichende Jira-Projektrechte besitzen:
 
 - Boards und Sprints sehen
 - Issues im Sprint sehen
 - Issues/Subtasks erstellen
 - Subtask-Issue-Type im Projekt verwenden dürfen
 
-Hinweis:
-
-Die exakten Scopes können je nach Atlassian Cloud Umgebung, Token-Typ,
-Service-Account-Konfiguration und Jira-Projektberechtigungen abweichen.
 Wenn das Lesen funktioniert, aber das Erstellen fehlschlägt, fehlt meist eine
 Write-Berechtigung oder das Projekt erlaubt dem Benutzer keine Subtask-Erstellung.
 
@@ -187,27 +170,41 @@ SPRINT VERHALTEN
 ===============================================================================
 
 -------------------------------------------------
-Standardmodus
+Menümodus
+-------------------------------------------------
+
+Aufruf ohne weitere Optionen:
+
+    python jira_subtask_creator.py
+
+oder als Binary:
+
+    jira_subtask_creator.exe
+
+Verhalten:
+
+- Es erscheint ein interaktives Menü.
+- Dort kann die Sprintauswahl per exaktem Namen gewählt werden.
+- Dort kann die Sprintauswahl per Liste/Filter gewählt werden.
+- Dry-Run kann im Menü umgeschaltet werden.
+- ENTER ohne Auswahl beendet das Programm.
+
+-------------------------------------------------
+Standardmodus per Kommandozeile
 -------------------------------------------------
 
 Aufruf:
 
-    python jira_subtask_creator.py
+    python jira_subtask_creator.py -s "Sprint Team 2"
+    python jira_subtask_creator.py --sprint "Sprint Team 2"
 
 Verhalten:
 
-- Sprintname muss exakt eingegeben werden
-- ENTER = Exit
-- closed Sprint wird blockiert
-- active/future erlaubt
-
-Beispiel:
-
-    python jira_subtask_creator.py
-
-Danach Eingabe:
-
-    Sprintname (exakt, ENTER = Beenden): Sprint Team 2
+- Sprintname muss exakt übergeben werden.
+- Der Parameter -s / --sprint benötigt zwingend einen String.
+- Ein leerer String ist ungültig.
+- closed Sprint wird blockiert.
+- active/future erlaubt.
 
 -------------------------------------------------
 Filtermodus (-f / --filter)
@@ -246,6 +243,12 @@ Beispiele:
 
     python jira_subtask_creator.py --dry-run
     python jira_subtask_creator.py -f "Team 2" --dry-run
+    python jira_subtask_creator.py -s "Sprint Team 2" --dry-run
+
+Im Menümodus wird Dry-Run über Menüpunkt 3 umgeschaltet:
+
+    3. Dry-Run [ ]
+    3. Dry-Run [x]
 
 ===============================================================================
 BENÖTIGTE DATEI- UND ORDNERSTRUKTUR
@@ -311,9 +314,9 @@ BEISPIELABLAUF
 
 5. Programm starten
 
-    python jira_subtask_creator.py -f
+    python jira_subtask_creator.py
 
-6. Sprint auswählen
+6. Im Menü Sprintauswahl wählen
 
 7. Programm erstellt die fehlenden Subtasks
 
@@ -345,6 +348,17 @@ welches Jira Label die jeweilige Unteraufgabe erzeugt oder übersprungen wurde.
 Subtasks selbst werden nicht als eigene Haupt-Issues verarbeitet.
 
 ===============================================================================
+WINDOWS / EXE VERHALTEN
+===============================================================================
+
+Ab Version V1.1 wartet das Programm vor dem Beenden immer auf eine
+ENTER-Bestätigung.
+
+Dies ist besonders wichtig, wenn die Windows EXE per Doppelklick gestartet wird.
+Ohne diese Bestätigung würde sich das Konsolenfenster bei Programmende oder bei
+einem Fehler sofort schließen, sodass der Benutzer die Meldung nicht lesen kann.
+
+===============================================================================
 NEUERUNG V0.7
 ===============================================================================
 
@@ -365,6 +379,18 @@ NEUERUNG V1.0
 ✔ Hilfe beschreibt empfohlene Token-Rechte und Scopes
 ✔ Dokumentation beschreibt Nutzung als Python-Skript und als Binary/EXE
 ✔ Report zeigt erstellte und übersprungene Subtasks gruppiert je Label
+
+===============================================================================
+NEUERUNG V1.1
+===============================================================================
+
+✔ Programm wartet vor jedem regulären Beenden auf ENTER
+✔ Programm wartet auch bei Fehlerfällen auf ENTER
+✔ Besseres Verhalten beim Start der Windows EXE per Doppelklick
+✔ Neuer Menümodus beim Start ohne Kommandozeilenoptionen
+✔ Dry-Run kann im Menü per [ ] / [x] umgeschaltet werden
+✔ Neue Kommandozeilenoption -s / --sprint für exakte Sprintauswahl
+✔ -s / --sprint benötigt einen nicht-leeren Sprintnamen
 
 ===============================================================================
 JIRA API
@@ -393,6 +419,11 @@ V1.0  Erste stabile Hauptversion auf Basis von V0.7
       Erweiterte Beschreibung der benötigten Dateien
       Erweiterte Beschreibung der API-Token-Rechte
       Reportausgabe gruppiert erstellte und übersprungene Subtasks je Label
+V1.1  Windows-/EXE-Verhalten verbessert
+      ENTER-Bestätigung vor Programmende und in Fehlerfällen
+      Interaktives Hauptmenü beim Start ohne Optionen
+      Dry-Run im Menü umschaltbar
+      Neue Option -s / --sprint für direkte exakte Sprintauswahl
 
 ===============================================================================
 """
@@ -401,6 +432,37 @@ __doc__ = DOCUMENTATION
 
 LOGIN_FILE = "confluence_login.txt"
 SUBTASK_DIR = "Subtasks"
+
+
+# ============================================================================
+# EXIT / PAUSE HANDLING
+# ============================================================================
+
+def wait_for_enter(message="ENTER zum Beenden..."):
+    try:
+        input(message)
+    except EOFError:
+        pass
+
+
+def exit_with_enter(code=0, message=None):
+    if message:
+        print(message)
+    wait_for_enter("ENTER zum Beenden...")
+    sys.exit(code)
+
+
+# ============================================================================
+# ARGUMENT PARSER
+# ============================================================================
+
+class PausingArgumentParser(argparse.ArgumentParser):
+    def error(self, message):
+        print(f"Fehler: {message}")
+        print()
+        self.print_help()
+        print()
+        exit_with_enter(2)
 
 
 # ============================================================================
@@ -418,6 +480,7 @@ AUFRUF
 Python Skript:
 
   python jira_subtask_creator.py
+  python jira_subtask_creator.py -s "Sprint Team 2"
   python jira_subtask_creator.py -f
   python jira_subtask_creator.py -f "Team 2"
   python jira_subtask_creator.py --dry-run
@@ -425,6 +488,7 @@ Python Skript:
 Linux Binary:
 
   ./jira_subtask_creator
+  ./jira_subtask_creator -s "Sprint Team 2"
   ./jira_subtask_creator -f
   ./jira_subtask_creator -f "Team 2"
   ./jira_subtask_creator --dry-run
@@ -432,6 +496,7 @@ Linux Binary:
 Windows EXE:
 
   jira_subtask_creator.exe
+  jira_subtask_creator.exe -s "Sprint Team 2"
   jira_subtask_creator.exe -f
   jira_subtask_creator.exe -f "Team 2"
   jira_subtask_creator.exe --dry-run
@@ -440,7 +505,10 @@ Windows EXE:
 OPTIONEN
 ===============================================================================
 
-  -f, --filter [TEXT]   Sprintauswahl aus Liste
+  -s, --sprint TEXT     Sprintauswahl per exaktem Sprintnamen.
+                        TEXT ist zwingend erforderlich und darf nicht leer sein.
+
+  -f, --filter [TEXT]   Sprintauswahl aus Liste.
                         Ohne TEXT werden alle offenen/aktiven Sprints angezeigt.
                         Mit TEXT werden nur Sprints angezeigt, deren Name diesen
                         Text enthält.
@@ -449,6 +517,17 @@ OPTIONEN
                         Es werden keine Änderungen in Jira durchgeführt.
 
   -h, --help            Diese Hilfe anzeigen.
+
+===============================================================================
+MENÜMODUS
+===============================================================================
+
+Wenn das Programm ohne Optionen gestartet wird, erscheint ein Menü:
+
+  1. Sprint per exaktem Namen auswählen
+  2. Sprint aus vorhandenen Sprints auswählen
+  3. Dry-Run [ ] / [x]
+  ENTER = Beenden
 
 ===============================================================================
 BENÖTIGTE DATEIEN
@@ -530,54 +609,20 @@ Beispielinhalt:
   Review durchführen
 
 ===============================================================================
-TOKEN / RECHTE / SCOPES
+TOKEN / RECHTE
 ===============================================================================
 
-Hinweis zu scoped API Tokens:
+Empfohlen wird ein klassischer Atlassian API Token.
 
-Für dieses Tool wird aktuell ein klassischer / unscoped Atlassian API Token
-empfohlen, da die verwendete Jira Software Agile API
-/rest/agile/1.0/board und /rest/agile/1.0/board/{id}/sprint mit scoped API
-Tokens je nach Atlassian Cloud Umgebung mit 401 fehlschlagen kann.
+Der Benutzer des Tokens benötigt im Jira Projekt Rechte zum:
 
-Wenn ein scoped Token verwendet wird und der Fehler
-"401: Client must be authenticated to access this resource" beim Zugriff auf
-/rest/agile/1.0/board erscheint, sollte ein klassischer API Token verwendet
-werden.
-
-
-Scoped Token:
-
-Das Programm benötigt Rechte zum:
-
-  - Lesen von Jira Boards
-  - Lesen von Jira Sprints
-  - Suchen und Lesen von Jira Issues
-  - Erstellen von Jira Subtasks
-
-Empfohlene klassische Jira Scopes:
-
-  read:jira-work
-  write:jira-work
-  read:jira-user
-
-Bei granularen Jira / Jira Software Scopes können zusätzlich bzw. alternativ
-folgende Scopes nötig sein:
-
-  read:board-scope:jira-software
-  read:sprint:jira-software
-  read:issue-details:jira
-  read:project:jira
-  write:issue:jira
-
-Zusätzlich benötigt der Benutzer passende Jira-Projektrechte:
-
+  - Boards und Sprints sehen
   - Issues ansehen
-  - Boards/Sprints sehen
   - Issues erstellen
   - Subtasks erstellen
 
-Ein Token mit vollständiger Admin-Freigabe ist dafür normalerweise nicht nötig.
+Scoped API Tokens können bei der Jira Software Agile API je nach Atlassian Cloud
+Umgebung mit 401 fehlschlagen.
 
 ===============================================================================
 REPORT
@@ -595,20 +640,6 @@ Der Report zeigt pro Haupt-Issue:
 Wenn mehrere Labels auf einem Issue vorhanden sind und zu diesen Labels passende
 Subtask-Dateien existieren, wird die Ausgabe je Label gruppiert.
 
-Beispiel:
-
-  ABC-123 [Story] Beispiel Issue
-
-    Label: Impl
-      Erstellt:
-        + Implementierung durchführen
-      Übersprungen:
-        - Unit Tests erstellen
-
-    Label: Test
-      Erstellt:
-        + Testfall erstellen
-
 ===============================================================================
 WICHTIGE REGELN
 ===============================================================================
@@ -621,29 +652,8 @@ WICHTIGE REGELN
   - Subtasks selbst werden nicht weiter verarbeitet.
 
 ===============================================================================
-BEISPIELE
-===============================================================================
-
-Alle offenen/aktiven Sprints anzeigen:
-
-  python jira_subtask_creator.py -f
-
-Nur Sprints mit "Team 2" im Namen anzeigen:
-
-  python jira_subtask_creator.py -f "Team 2"
-
-Simulation ohne Änderungen:
-
-  python jira_subtask_creator.py -f "Team 2" --dry-run
-
-Direkte exakte Sprint-Eingabe:
-
-  python jira_subtask_creator.py
-
-===============================================================================
 """)
-    input("\nENTER zum Beenden...")
-    sys.exit(0)
+    exit_with_enter(0)
 
 
 # ============================================================================
@@ -652,10 +662,13 @@ Direkte exakte Sprint-Eingabe:
 
 def read_login():
     if not os.path.exists(LOGIN_FILE):
-        sys.exit(f"Fehler: {LOGIN_FILE} nicht gefunden.")
+        raise RuntimeError(f"Fehler: {LOGIN_FILE} nicht gefunden.")
 
     with open(LOGIN_FILE, "r", encoding="utf-8") as f:
         lines = [l.strip() for l in f.readlines() if l.strip()]
+
+    if len(lines) < 3:
+        raise RuntimeError(f"Fehler: {LOGIN_FILE} muss mindestens 3 nicht-leere Zeilen enthalten, siehe Hlfe -h or --help")
 
     return lines[0], lines[1], lines[2]
 
@@ -668,9 +681,12 @@ def load_subtask_definitions():
     result = {}
 
     if not os.path.isdir(SUBTASK_DIR):
-        sys.exit(f"Fehler: Ordner '{SUBTASK_DIR}' fehlt.")
+        raise RuntimeError(f"Fehler: Ordner '{SUBTASK_DIR}' fehlt.")
 
     files = glob.glob(os.path.join(SUBTASK_DIR, "Subtasks_*.txt"))
+
+    if not files:
+        raise RuntimeError(f"Fehler: Keine Dateien 'Subtasks_*.txt' im Ordner '{SUBTASK_DIR}' gefunden.")
 
     for file in files:
         label = os.path.basename(file).replace("Subtasks_", "").replace(".txt", "")
@@ -690,7 +706,7 @@ def load_subtask_definitions():
 def jira_get(base_url, auth, endpoint, params=None):
     r = requests.get(base_url + endpoint, auth=auth, params=params)
     if not r.ok:
-        raise Exception(f"{r.status_code}: {r.text}")
+        raise RuntimeError(f"{r.status_code}: {r.text}")
     return r.json()
 
 
@@ -702,7 +718,7 @@ def jira_post(base_url, auth, endpoint, payload):
         headers={"Content-Type": "application/json"}
     )
     if not r.ok:
-        raise Exception(f"{r.status_code}: {r.text}")
+        raise RuntimeError(f"{r.status_code}: {r.text}")
     return r.json()
 
 
@@ -744,8 +760,10 @@ def fetch_all_sprints(base_url, auth):
 def is_closed_sprint(sprint):
     return sprint.get("state", "").lower() == "closed"
 
+
 def sprint_label(s):
     return f"{s['name']} ({s.get('state','')})"
+
 
 def select_sprint_filtered(base_url, auth, filter_string=None):
     sprints = fetch_all_sprints(base_url, auth)
@@ -756,9 +774,7 @@ def select_sprint_filtered(base_url, auth, filter_string=None):
         sprints = [s for s in sprints if filter_string.lower() in s["name"].lower()]
 
     if not sprints:
-        print("Keine offenen/aktiven Sprints gefunden.")
-        input("ENTER zum Beenden...")
-        sys.exit(0)
+        exit_with_enter(0, "Keine offenen/aktiven Sprints gefunden.")
 
     print("\nVerfügbare offene/aktive Sprints:\n")
 
@@ -770,16 +786,14 @@ def select_sprint_filtered(base_url, auth, filter_string=None):
 
         if choice == "":
             print("Programm wird beendet.")
-            input("ENTER zum Bestätigen...")
-            sys.exit(0)
+            exit_with_enter(0)
 
         if choice.isdigit() and 1 <= int(choice) <= len(sprints):
             return sprints[int(choice) - 1]["name"]
 
         print("Ungültige Auswahl.")
         print("Programm wird beendet.")
-        input("ENTER zum Bestätigen...")
-        sys.exit(0)
+        exit_with_enter(0)
 
 
 def validate_exact_sprint(base_url, auth, sprint_name):
@@ -788,14 +802,12 @@ def validate_exact_sprint(base_url, auth, sprint_name):
     for s in sprints:
         if s["name"] == sprint_name:
 
-            # >>> NEU V0.7: EXPLIZITE CLOSED MESSAGE <<<
             if is_closed_sprint(s):
                 print("\n========================================")
                 print(f"SPRINT GESCHLOSSEN: {sprint_name}")
                 print("Es werden KEINE Subtasks erstellt.")
                 print("========================================\n")
-                input("ENTER zum Beenden...")
-                sys.exit(0)
+                exit_with_enter(0)
 
             return True
 
@@ -850,45 +862,67 @@ def create_subtask(base_url, auth, issue, title):
 
 
 # ============================================================================
-# MAIN
+# MENU
 # ============================================================================
 
-def main():
+def show_main_menu(dry_run):
+    dry_run_marker = "[x]" if dry_run else "[ ]"
 
-    parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument("-f", "--filter", nargs="?", const="")
-    parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("-h", "--help", action="store_true")
-
-    args = parser.parse_args()
-
-    if args.help:
-        show_help()
-
+    print("\n" + "=" * 72)
     print(f"Jira Subtask Creator {APP_VERSION}")
-    print("-------------------------")
+    print("=" * 72)
+    print("1. Sprint per exaktem Namen auswählen")
+    print("2. Sprint aus vorhandenen Sprints auswählen")
+    print(f"3. Dry-Run {dry_run_marker}")
+    print()
+    print("ENTER = Beenden")
 
-    base_url, user, token = read_login()
-    auth = HTTPBasicAuth(user, token)
 
-    definitions = load_subtask_definitions()
+def menu_select_sprint(base_url, auth, initial_dry_run):
+    dry_run = initial_dry_run
 
-    if args.filter is not None:
-        sprint_name = select_sprint_filtered(base_url, auth, args.filter)
-    else:
-        sprint_name = input("Sprintname (exakt, ENTER = Beenden): ").strip()
+    while True:
+        show_main_menu(dry_run)
+        choice = input("\nAuswahl: ").strip()
 
-        if sprint_name == "":
+        if choice == "":
             print("Programm wird beendet.")
-            input("ENTER zum Bestätigen...")
-            sys.exit(0)
+            exit_with_enter(0)
 
-        if not validate_exact_sprint(base_url, auth, sprint_name):
-            print("Sprint nicht gefunden.")
-            input("ENTER zum Beenden...")
-            sys.exit(0)
+        if choice == "1":
+            sprint_name = input("Sprintname (exakt, ENTER = Beenden): ").strip()
 
+            if sprint_name == "":
+                print()
+                exit_with_enter(0)
+
+            if not validate_exact_sprint(base_url, auth, sprint_name):
+                print("Sprint nicht gefunden.")
+                exit_with_enter(0)
+
+            return sprint_name, dry_run
+
+        if choice == "2":
+            filter_string = input("Filtertext optional (ENTER = alle offenen/aktiven Sprints): ").strip()
+            sprint_name = select_sprint_filtered(base_url, auth, filter_string)
+            return sprint_name, dry_run
+
+        if choice == "3":
+            dry_run = not dry_run
+            continue
+
+        print("Ungültige Auswahl.")
+
+
+# ============================================================================
+# PROCESSING
+# ============================================================================
+
+def process_sprint(base_url, auth, definitions, sprint_name, dry_run):
     print(f"\nSprint: {sprint_name}")
+
+    if dry_run:
+        print("DRY-RUN aktiv - es werden keine Änderungen in Jira durchgeführt.")
 
     print("Lade Issues...")
 
@@ -925,7 +959,7 @@ def main():
                     label_report[label]["skipped"].append(task)
                     continue
 
-                if args.dry_run:
+                if dry_run:
                     label_report[label]["created"].append(task + " [DRY-RUN]")
                     continue
 
@@ -969,5 +1003,76 @@ def main():
     print("\nFertig.")
 
 
+# ============================================================================
+# MAIN
+# ============================================================================
+
+def option_present(short_option, long_option):
+    for arg in sys.argv[1:]:
+        if arg == short_option or arg == long_option or arg.startswith(long_option + "="):
+            return True
+    return False
+
+
+def main():
+
+    parser = PausingArgumentParser(add_help=False)
+    parser.add_argument("-s", "--sprint", default="")
+    parser.add_argument("-f", "--filter", nargs="?", const="", default=None)
+    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("-h", "--help", action="store_true")
+
+    args = parser.parse_args()
+
+    if args.help:
+        show_help()
+
+    print(f"Jira Subtask Creator {APP_VERSION}")
+    print("-------------------------")
+
+    base_url, user, token = read_login()
+    auth = HTTPBasicAuth(user, token)
+
+    definitions = load_subtask_definitions()
+
+    sprint_option_used = option_present("-s", "--sprint")
+    filter_option_used = args.filter is not None
+
+    if sprint_option_used and filter_option_used:
+        exit_with_enter(2, "Fehler: -s/--sprint und -f/--filter dürfen nicht gemeinsam verwendet werden.")
+
+    if sprint_option_used:
+        sprint_name = args.sprint.strip()
+
+        if sprint_name == "":
+            exit_with_enter(2, "Fehler: -s/--sprint benötigt einen nicht-leeren Sprintnamen.")
+
+        if not validate_exact_sprint(base_url, auth, sprint_name):
+            print("Sprint nicht gefunden.")
+            exit_with_enter(0)
+
+        dry_run = args.dry_run
+
+    elif filter_option_used:
+        sprint_name = select_sprint_filtered(base_url, auth, args.filter)
+        dry_run = args.dry_run
+
+    else:
+        sprint_name, dry_run = menu_select_sprint(base_url, auth, args.dry_run)
+
+    process_sprint(base_url, auth, definitions, sprint_name, dry_run)
+
+
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+        exit_with_enter(0)
+    except SystemExit:
+        raise
+    except KeyboardInterrupt:
+        print("\nProgramm wurde durch Benutzer abgebrochen.")
+        exit_with_enter(1)
+    except Exception as e:
+        print("\nFEHLER:")
+        print(e)
+        exit_with_enter(1)
