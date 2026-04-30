@@ -662,13 +662,13 @@ WICHTIGE REGELN
 
 def read_login():
     if not os.path.exists(LOGIN_FILE):
-        raise RuntimeError(f"Fehler: {LOGIN_FILE} nicht gefunden.")
+        raise RuntimeError(f"Fehler: {LOGIN_FILE} nicht gefunden, siehe Hilfe -h oder --help.")
 
     with open(LOGIN_FILE, "r", encoding="utf-8") as f:
         lines = [l.strip() for l in f.readlines() if l.strip()]
 
     if len(lines) < 3:
-        raise RuntimeError(f"Fehler: {LOGIN_FILE} muss mindestens 3 nicht-leere Zeilen enthalten, siehe Hlfe -h or --help")
+        raise RuntimeError(f"Fehler: {LOGIN_FILE} muss mindestens 3 nicht-leere Zeilen enthalten, siehe Hilfe -h oder --help.")
 
     return lines[0], lines[1], lines[2]
 
@@ -681,12 +681,12 @@ def load_subtask_definitions():
     result = {}
 
     if not os.path.isdir(SUBTASK_DIR):
-        raise RuntimeError(f"Fehler: Ordner '{SUBTASK_DIR}' fehlt.")
+        raise RuntimeError(f"Fehler: Ordner '{SUBTASK_DIR}' fehlt, siehe Hilfe -h oder --help.")
 
     files = glob.glob(os.path.join(SUBTASK_DIR, "Subtasks_*.txt"))
 
     if not files:
-        raise RuntimeError(f"Fehler: Keine Dateien 'Subtasks_*.txt' im Ordner '{SUBTASK_DIR}' gefunden.")
+        raise RuntimeError(f"Fehler: Keine Dateien 'Subtasks_*.txt' im Ordner '{SUBTASK_DIR}' gefunden, siehe Hilfe -h oder --help.")
 
     for file in files:
         label = os.path.basename(file).replace("Subtasks_", "").replace(".txt", "")
