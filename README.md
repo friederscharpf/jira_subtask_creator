@@ -25,6 +25,9 @@ Das Tool liest Issues aus einem Sprint, prüft deren Jira-Labels und erstellt an
 - Dry-Run-Modus zur Simulation
 - Report mit gruppierter Ausgabe nach Label
 - Nutzbar als Python-Skript, Linux-Binary oder Windows-EXE
+- Hilfe direkt im Menü verfügbar
+- Scrollbare Hilfe in kompatiblen Terminals (Pager-Unterstützung)
+- Automatische Erkennung, ob ein Terminal-Pager verfügbar ist
 
 ## Benötigte Struktur
 
@@ -139,6 +142,20 @@ Hilfe anzeigen:
 python jira_subtask_creator.py -h
 ```
 
+## Hilfeverhalten (neu in V1.2)
+
+- In echten Terminals (z. B. Linux Shell):
+  - Anzeige über einen Pager (z. B. less)
+  - Scrollen möglich
+  - Beenden mit q
+  - Keine zusätzliche ENTER-Bestätigung notwendig
+
+- In einfachen Konsolen (Windows EXE, IDEs):
+  - Vollständige Ausgabe der Hilfe
+  - Danach ENTER zur Rückkehr ins Menü erforderlich
+
+Das Verhalten wird automatisch erkannt.
+
 ## Token und Rechte
 
 Empfohlen wird ein klassischer Atlassian API Token.
@@ -175,7 +192,7 @@ bin/windows/jira_subtask_creator.exe
 
 ## Lizenz
 
-Dieses Projekt unterliegt der Apache-Lizenz 2.0. Weitere Informationen finden Sie in der Datei „LICENSE“.
+Dieses Projekt unterliegt der Apache-Lizenz 2.0. Weitere Informationen finden Sie in der Datei "LICENSE".
 
 ---
 
@@ -197,6 +214,9 @@ The tool reads issues from a sprint, checks their Jira labels, and creates match
 - Dry-run mode for simulation
 - Report grouped by label
 - Usable as Python script, Linux binary, or Windows EXE
+- Help available directly in the menu
+- Scrollable help in supported terminals (pager support)
+- Automatic detection of pager capability
 
 ## Required Structure
 
@@ -310,6 +330,20 @@ Show help:
 ```bash
 python jira_subtask_creator.py -h
 ```
+
+## Help Behavior (new in V1.2)
+
+- In real terminals:
+  - Uses pager (for example less)
+  - Scrollable output
+  - Exit with q
+  - No additional ENTER confirmation required
+
+- In simple consoles (Windows EXE, IDEs):
+  - Full output is printed
+  - ENTER required to return
+
+Behavior is detected automatically.
 
 ## Token and Permissions
 

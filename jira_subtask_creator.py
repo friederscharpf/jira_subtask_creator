@@ -6,9 +6,10 @@ import sys
 import glob
 import argparse
 import requests
+import pydoc
 from requests.auth import HTTPBasicAuth
 
-APP_VERSION = "V1.1"
+APP_VERSION = "V1.2"
 
 DOCUMENTATION = f"""
 ===============================================================================
@@ -187,6 +188,8 @@ Verhalten:
 - Dort kann die Sprintauswahl per exaktem Namen gewählt werden.
 - Dort kann die Sprintauswahl per Liste/Filter gewählt werden.
 - Dry-Run kann im Menü umgeschaltet werden.
+- Die Hilfe kann im Menü angezeigt werden.
+- Nach dem Beenden der Hilfe mit ENTER kommt der Benutzer zurück ins Menü.
 - ENTER ohne Auswahl beendet das Programm.
 
 -------------------------------------------------
@@ -249,6 +252,44 @@ Im Menümodus wird Dry-Run über Menüpunkt 3 umgeschaltet:
 
     3. Dry-Run [ ]
     3. Dry-Run [x]
+
+===============================================================================
+HILFE IM MENÜ
+===============================================================================
+
+Ab Version V1.2 kann die Hilfe auch direkt im interaktiven Menü ausgewählt
+werden.
+
+Verhalten:
+
+- Die Hilfe wird in einer Pager-Ansicht angezeigt, sofern das Terminal dies
+  unterstützt.
+- Dadurch kann die Hilfe auch in kleinen Terminalfenstern besser gelesen werden.
+- Nach dem Schließen bzw. Beenden der Hilfe kommt der Benutzer wieder zurück
+  ins Menü.
+- Die Kommandozeilenoption -h / --help zeigt weiterhin die Hilfe an und beendet
+  das Programm danach mit ENTER-Bestätigung.
+
+Hinweis:
+
+Das tatsächliche Scroll-Verhalten hängt vom verwendeten Terminal und Betriebssystem
+ab. Unter Linux wird typischerweise ein Terminal-Pager verwendet. Unter Windows
+wird die Hilfe mindestens vollständig ausgegeben und anschließend mit ENTER
+beendet.
+
+Zusätzliche technische Logik:
+
+- Wenn das Programm erkennt, dass es in einem interaktiven Terminal ausgeführt
+  wird, wird die Hilfe über pydoc.pager() ausgegeben.
+- In Terminals mit funktionierendem Pager kann der Benutzer die Hilfe über den
+  Pager schließen und kommt anschließend direkt zurück ins Menü.
+- Wenn kein interaktives Terminal erkannt wird, wird die Hilfe direkt ausgegeben
+  und der Benutzer muss mit ENTER bestätigen, bevor das Programm ins Menü
+  zurückkehrt bzw. beendet wird.
+- Dadurch wird vermieden, dass bei echten Pager-Terminals eine zusätzliche
+  unnötige ENTER-Bestätigung erforderlich ist.
+- Gleichzeitig bleibt das Verhalten für einfache Terminals, Windows-EXE-Starts
+  und Umgebungen ohne Pager sicher lesbar.
 
 ===============================================================================
 BENÖTIGTE DATEI- UND ORDNERSTRUKTUR
@@ -393,6 +434,21 @@ NEUERUNG V1.1
 ✔ -s / --sprint benötigt einen nicht-leeren Sprintnamen
 
 ===============================================================================
+NEUERUNG V1.2
+===============================================================================
+
+✔ Hilfe ist nun auch direkt im interaktiven Menü auswählbar
+✔ Hilfe kehrt nach ENTER wieder ins Menü zurück
+✔ Hilfeausgabe nutzt eine Pager-Ausgabe, sofern vom Terminal unterstützt
+✔ Menü wurde um einen Hilfe-Menüpunkt erweitert
+✔ Dokumentation wurde um das Hilfeverhalten im Menü erweitert
+✔ Hilfeausgabe unterscheidet zwischen interaktivem Terminal und einfachem
+  Ausgabemodus ohne Pager
+✔ Bei funktionierendem Pager ist keine zusätzliche ENTER-Bestätigung nötig
+✔ Ohne interaktiven Pager wird ENTER zur Rückkehr ins Menü bzw. zum Beenden
+  abgefragt
+
+===============================================================================
 JIRA API
 ===============================================================================
 
@@ -424,6 +480,10 @@ V1.1  Windows-/EXE-Verhalten verbessert
       Interaktives Hauptmenü beim Start ohne Optionen
       Dry-Run im Menü umschaltbar
       Neue Option -s / --sprint für direkte exakte Sprintauswahl
+V1.2  Hilfe im interaktiven Menü ergänzt
+      Hilfeausgabe mit Pager-Unterstützung ergänzt
+      Rückkehr ins Menü nach Hilfeanzeige ergänzt
+      Pager-/Nicht-Pager-Verhalten für Hilfeausgabe verbessert
 
 ===============================================================================
 """
@@ -469,8 +529,8 @@ class PausingArgumentParser(argparse.ArgumentParser):
 # HELP
 # ============================================================================
 
-def show_help():
-    print(f"""
+def get_help_text():
+    return f"""
 Jira Subtask Creator {APP_VERSION}
 
 ===============================================================================
@@ -527,7 +587,11 @@ Wenn das Programm ohne Optionen gestartet wird, erscheint ein Menü:
   1. Sprint per exaktem Namen auswählen
   2. Sprint aus vorhandenen Sprints auswählen
   3. Dry-Run [ ] / [x]
+  4. Hilfe anzeigen
   ENTER = Beenden
+
+Wenn die Hilfe über das Menü geöffnet wird, kommt der Benutzer nach dem Beenden
+der Hilfe wieder zurück ins Menü.
 
 ===============================================================================
 BENÖTIGTE DATEIEN
@@ -652,8 +716,20 @@ WICHTIGE REGELN
   - Subtasks selbst werden nicht weiter verarbeitet.
 
 ===============================================================================
-""")
-    exit_with_enter(0)
+"""
+
+
+def show_help(exit_after=True):
+    help_text = get_help_text()
+
+    if sys.stdout.isatty():
+        pydoc.pager(help_text)
+    else:
+        print(help_text)
+        wait_for_enter("ENTER zum Fortfahren...")
+
+    if exit_after:
+        exit_with_enter(0)
 
 
 # ============================================================================
@@ -662,13 +738,13 @@ WICHTIGE REGELN
 
 def read_login():
     if not os.path.exists(LOGIN_FILE):
-        raise RuntimeError(f"Fehler: {LOGIN_FILE} nicht gefunden, siehe Hilfe -h oder --help.")
+        raise RuntimeError(f"Fehler: {LOGIN_FILE} nicht gefunden.")
 
     with open(LOGIN_FILE, "r", encoding="utf-8") as f:
         lines = [l.strip() for l in f.readlines() if l.strip()]
 
     if len(lines) < 3:
-        raise RuntimeError(f"Fehler: {LOGIN_FILE} muss mindestens 3 nicht-leere Zeilen enthalten, siehe Hilfe -h oder --help.")
+        raise RuntimeError(f"Fehler: {LOGIN_FILE} muss mindestens 3 nicht-leere Zeilen enthalten, siehe Hlfe -h or --help")
 
     return lines[0], lines[1], lines[2]
 
@@ -681,12 +757,12 @@ def load_subtask_definitions():
     result = {}
 
     if not os.path.isdir(SUBTASK_DIR):
-        raise RuntimeError(f"Fehler: Ordner '{SUBTASK_DIR}' fehlt, siehe Hilfe -h oder --help.")
+        raise RuntimeError(f"Fehler: Ordner '{SUBTASK_DIR}' fehlt.")
 
     files = glob.glob(os.path.join(SUBTASK_DIR, "Subtasks_*.txt"))
 
     if not files:
-        raise RuntimeError(f"Fehler: Keine Dateien 'Subtasks_*.txt' im Ordner '{SUBTASK_DIR}' gefunden, siehe Hilfe -h oder --help.")
+        raise RuntimeError(f"Fehler: Keine Dateien 'Subtasks_*.txt' im Ordner '{SUBTASK_DIR}' gefunden.")
 
     for file in files:
         label = os.path.basename(file).replace("Subtasks_", "").replace(".txt", "")
@@ -874,6 +950,7 @@ def show_main_menu(dry_run):
     print("1. Sprint per exaktem Namen auswählen")
     print("2. Sprint aus vorhandenen Sprints auswählen")
     print(f"3. Dry-Run {dry_run_marker}")
+    print("4. Hilfe anzeigen")
     print()
     print("ENTER = Beenden")
 
@@ -909,6 +986,10 @@ def menu_select_sprint(base_url, auth, initial_dry_run):
 
         if choice == "3":
             dry_run = not dry_run
+            continue
+
+        if choice == "4":
+            show_help(exit_after=False)
             continue
 
         print("Ungültige Auswahl.")
