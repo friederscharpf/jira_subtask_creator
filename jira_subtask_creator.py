@@ -9,223 +9,226 @@ import requests
 import pydoc
 from requests.auth import HTTPBasicAuth
 
-APP_VERSION = "V1.2"
+APP_VERSION = "V1.3"
 
 DOCUMENTATION = f"""
 ===============================================================================
-Datei        : jira_subtask_creator.py
+File         : jira_subtask_creator.py
 Version      : {APP_VERSION}
-Autor        : ChatGPT
+Author       : ChatGPT
 
 ===============================================================================
-WICHTIGER HINWEIS ZUR DOKUMENTATION
+IMPORTANT DOCUMENTATION NOTE
 ===============================================================================
 
-Diese Dokumentation ist vollständig und darf in zukünftigen Versionen nicht
-gekürzt werden. Es sind nur Erweiterungen erlaubt, keine Entfernung von
-bestehenden Abschnitten.
+This documentation is intentionally complete and must not be shortened in future
+versions. Existing sections must be kept. Future changes should only extend this
+documentation, not remove or reduce existing content.
 
 ===============================================================================
-ZWECK DES PROGRAMMS
+PURPOSE
 ===============================================================================
 
-Dieses Programm automatisiert das Erstellen von Jira Subtasks für Issues
-innerhalb eines ausgewählten Sprints in Jira Cloud.
+This program automates the creation of Jira subtasks for issues inside a
+selected sprint in Jira Cloud.
 
-Es verbindet sich über die Jira REST API, liest Issues aus einem Sprint aus
-und erstellt auf Basis von Label-Definitionen automatisch Subtasks.
-
-===============================================================================
-GRUNDLOGIK
-===============================================================================
-
-1. Sprint wird ausgewählt:
-   - über Menü
-   - manuell per exakter Eingabe
-   - über Filtermodus (-f / --filter)
-   - direkt per Parameter (-s / --sprint)
-
-2. Sprint wird validiert (inkl. Statusprüfung)
-   - nur active und future erlaubt
-   - closed wird blockiert
-
-3. Alle Issues im Sprint werden geladen
-
-4. Nur Haupt-Issues werden verarbeitet
-
-5. Labels bestimmen Subtask-Definitionen
-
-6. Fehlende Subtasks werden erstellt
-
-7. Bereits vorhandene Subtasks werden übersprungen
-
-8. Ergebnisbericht wird ausgegeben
-
-9. Vor Programmende muss der Benutzer mit ENTER bestätigen.
-   Das gilt auch für Fehlerfälle, damit sich ein Windows-Konsolenfenster beim
-   Start per Doppelklick nicht sofort schließt.
+It connects to the Jira REST API, reads issues from a sprint, checks their Jira
+labels, and creates subtasks based on local label-specific definition files.
 
 ===============================================================================
-SUBTASK-DEFINITIONEN
+BASIC WORKFLOW
 ===============================================================================
 
-Verzeichnis:
+1. A sprint is selected:
+   - via interactive menu
+   - by entering the exact sprint name
+   - via filter mode (-f / --filter)
+   - directly via command line option (-s / --sprint)
+
+2. The sprint is validated, including state checking:
+   - active and future sprints are allowed
+   - closed sprints are blocked
+
+3. All issues in the sprint are loaded
+
+4. Only parent issues are processed
+
+5. Labels determine the matching subtask definitions
+
+6. Missing subtasks are created
+
+7. Already existing subtasks are skipped
+
+8. A result report is printed
+
+9. Before the program exits, the user must confirm with ENTER.
+   This also applies to error cases so that a Windows console window does not
+   close immediately when the EXE is started by double-click.
+
+===============================================================================
+SUBTASK DEFINITIONS
+===============================================================================
+
+Directory:
 
     ./Subtasks/
 
-Dateien:
+Files:
 
     Subtasks_<LABEL>.txt
 
-Beispiele:
+Examples:
 
     Subtasks_Impl.txt
     Subtasks_Test.txt
     Subtasks_Spez.txt
 
-Inhalt:
+Content:
 
-    Eine Zeile = ein Subtask Titel
+    One line = one subtask title
 
-Beispiel Datei:
+Example file:
 
     Subtasks/Subtasks_Impl.txt
 
-Beispiel Inhalt:
+Example content:
 
-    Implementierung durchführen
-    Unit Tests erstellen
-    Review durchführen
+    Implement feature
+    Create unit tests
+    Perform review
 
-Wichtig:
+Important:
 
-- Der Teil nach "Subtasks_" und vor ".txt" ist das Jira Label.
-- Die Datei "Subtasks_Impl.txt" gilt also für Issues mit dem Label "Impl".
-- Das Label muss exakt so im Jira Issue vorhanden sein.
-- Jede nicht-leere Zeile wird als eigener Subtask-Titel verwendet.
-- Doppelte Zeilen innerhalb einer Datei werden intern entfernt.
-- Bereits vorhandene Subtasks mit gleichem Titel werden nicht erneut erstellt.
+- The part after "Subtasks_" and before ".txt" is the Jira label.
+- The file "Subtasks_Impl.txt" applies to issues with the Jira label "Impl".
+- The label must exist exactly like this on the Jira issue.
+- Each non-empty line is used as one subtask title.
+- Duplicate lines inside one definition file are removed internally.
+- Already existing subtasks with the same title are not created again.
 
 ===============================================================================
-LOGIN DATEI
+LOGIN FILE
 ===============================================================================
 
-confluence_login.txt (3 Zeilen):
+confluence_login.txt with 3 lines:
 
     https://your-domain.atlassian.net
     email@domain.com
     API_TOKEN
 
-Beispiel:
+Example:
 
     https://example.atlassian.net
     max.mustermann@example.com
     ATATT3xFfGF0...
 
-Wichtig:
+Important:
 
-- Die Datei muss im gleichen Verzeichnis wie jira_subtask_creator.py liegen.
-- Die erste Zeile ist die Jira Cloud Basis-URL.
-- Die zweite Zeile ist die Atlassian Login-E-Mail-Adresse.
-- Die dritte Zeile ist der Atlassian API Token.
-- Leerzeilen werden ignoriert.
-- Die Datei sollte nicht in ein Git Repository eingecheckt werden.
+- The file must be located in the same directory as jira_subtask_creator.py.
+- The first line is the Jira Cloud base URL.
+- The second line is the Atlassian login email address.
+- The third line is the Atlassian API token.
+- Empty lines are ignored.
+- This file should not be committed to a Git repository.
 
 ===============================================================================
-TOKEN / RECHTE / SCOPES
+TOKEN / PERMISSIONS / SCOPES
 ===============================================================================
 
-Das Programm benötigt Rechte zum:
+The program requires permissions to:
 
-1. Lesen von Boards und Sprints
-2. Suchen und Lesen von Jira Issues
-3. Erstellen von Issues / Subtasks
+1. Read boards and sprints
+2. Search and read Jira issues
+3. Create issues / subtasks
 
-Hinweis zu Atlassian API Tokens:
+Note about Atlassian API tokens:
 
-Für dieses Tool wird aktuell ein klassischer / unscoped Atlassian API Token
-empfohlen, da die verwendete Jira Software Agile API:
+A classic / unscoped Atlassian API token is currently recommended for this tool
+because the Jira Software Agile API endpoints used by this program:
 
     /rest/agile/1.0/board
     /rest/agile/1.0/board/{{id}}/sprint
 
-mit scoped API Tokens je nach Atlassian Cloud Umgebung mit Fehlern wie:
+may fail with scoped API tokens in some Atlassian Cloud environments with errors
+such as:
 
     401: Client must be authenticated to access this resource
 
-fehlschlagen kann, obwohl scheinbar passende Scopes gesetzt wurden.
+even if apparently matching scopes were configured.
 
-Bei einem klassischen API Token muss zusätzlich der Jira Benutzer, zu dem der
-API Token gehört, im jeweiligen Projekt ausreichende Jira-Projektrechte besitzen:
+When using a classic API token, the Jira user associated with the token must also
+have sufficient project permissions:
 
-- Boards und Sprints sehen
-- Issues im Sprint sehen
-- Issues/Subtasks erstellen
-- Subtask-Issue-Type im Projekt verwenden dürfen
+- view boards and sprints
+- view issues in the sprint
+- create issues/subtasks
+- use the Sub-task issue type in the project
 
-Wenn das Lesen funktioniert, aber das Erstellen fehlschlägt, fehlt meist eine
-Write-Berechtigung oder das Projekt erlaubt dem Benutzer keine Subtask-Erstellung.
+If reading works but creating subtasks fails, the user usually lacks write
+permissions or the project does not allow the user to create subtasks.
 
 ===============================================================================
-SPRINT VERHALTEN
+SPRINT BEHAVIOR
 ===============================================================================
 
 -------------------------------------------------
-Menümodus
+Interactive menu mode
 -------------------------------------------------
 
-Aufruf ohne weitere Optionen:
+Call without further options:
 
     python jira_subtask_creator.py
 
-oder als Binary:
+or as binary:
 
     jira_subtask_creator.exe
 
-Verhalten:
+Behavior:
 
-- Es erscheint ein interaktives Menü.
-- Dort kann die Sprintauswahl per exaktem Namen gewählt werden.
-- Dort kann die Sprintauswahl per Liste/Filter gewählt werden.
-- Dry-Run kann im Menü umgeschaltet werden.
-- Die Hilfe kann im Menü angezeigt werden.
-- Nach dem Beenden der Hilfe mit ENTER kommt der Benutzer zurück ins Menü.
-- ENTER ohne Auswahl beendet das Programm.
+- An interactive menu is shown.
+- The sprint can be selected by exact name.
+- The sprint can be selected from an existing sprint list with optional filter.
+- Dry-run can be toggled in the menu.
+- Help can be displayed from the menu.
+- After closing the help view, the user returns to the menu.
+- ENTER without a selection exits the program.
 
 -------------------------------------------------
-Standardmodus per Kommandozeile
+Command line mode with exact sprint name
 -------------------------------------------------
 
-Aufruf:
+Call:
 
     python jira_subtask_creator.py -s "Sprint Team 2"
     python jira_subtask_creator.py --sprint "Sprint Team 2"
 
-Verhalten:
+Behavior:
 
-- Sprintname muss exakt übergeben werden.
-- Der Parameter -s / --sprint benötigt zwingend einen String.
-- Ein leerer String ist ungültig.
-- closed Sprint wird blockiert.
-- active/future erlaubt.
+- The sprint name must be passed exactly.
+- The parameter -s / --sprint requires a non-empty string.
+- An empty string is invalid.
+- Closed sprints are blocked.
+- Active and future sprints are allowed.
 
 -------------------------------------------------
-Filtermodus (-f / --filter)
+Filter mode (-f / --filter)
 -------------------------------------------------
-Aufruf:
+
+Call:
 
     -f
     -f ""
     -f "Team 2"
 
-VERHALTEN:
+Behavior:
 
-- zeigt ALLE active + future Sprints (geschlossene Sprints werden nicht angezeigt)
-- optional Filterstring möglich
-- Auswahl per Nummer
-- ENTER = Exit
+- Shows all active and future sprints.
+- Closed sprints are not shown.
+- An optional filter string can be used.
+- Selection is done by number.
+- ENTER exits the program.
 
-Beispiele:
+Examples:
 
     python jira_subtask_creator.py -f
     python jira_subtask_creator.py --filter
@@ -238,71 +241,88 @@ DRY RUN
 
 --dry-run:
 
-- Simulation
-- keine Änderungen in Jira
-- gleiche Ausgabe wie produktiv mit vollständigem Report
+- simulation only
+- no changes are made in Jira
+- same report as productive mode
 
-Beispiele:
+Examples:
 
     python jira_subtask_creator.py --dry-run
     python jira_subtask_creator.py -f "Team 2" --dry-run
     python jira_subtask_creator.py -s "Sprint Team 2" --dry-run
 
-Im Menümodus wird Dry-Run über Menüpunkt 3 umgeschaltet:
+In menu mode, dry-run is toggled using menu item 3:
 
     3. Dry-Run [ ]
     3. Dry-Run [x]
 
 ===============================================================================
-HILFE IM MENÜ
+HELP IN MENU
 ===============================================================================
 
-Ab Version V1.2 kann die Hilfe auch direkt im interaktiven Menü ausgewählt
-werden.
+Starting with version V1.2, help can also be opened directly from the interactive
+menu.
 
-Verhalten:
+Behavior:
 
-- Die Hilfe wird in einer Pager-Ansicht angezeigt, sofern das Terminal dies
-  unterstützt.
-- Dadurch kann die Hilfe auch in kleinen Terminalfenstern besser gelesen werden.
-- Nach dem Schließen bzw. Beenden der Hilfe kommt der Benutzer wieder zurück
-  ins Menü.
-- Die Kommandozeilenoption -h / --help zeigt weiterhin die Hilfe an und beendet
-  das Programm danach mit ENTER-Bestätigung.
+- Help is displayed through a pager if the terminal supports it.
+- This makes the help readable even in small terminal windows.
+- After closing the help view, the user returns to the menu.
+- The command line option -h / --help still displays help and then exits after
+  ENTER confirmation.
 
-Hinweis:
+Note:
 
-Das tatsächliche Scroll-Verhalten hängt vom verwendeten Terminal und Betriebssystem
-ab. Unter Linux wird typischerweise ein Terminal-Pager verwendet. Unter Windows
-wird die Hilfe mindestens vollständig ausgegeben und anschließend mit ENTER
-beendet.
+The actual scrolling behavior depends on the terminal and operating system. On
+Linux, a terminal pager is typically used. On Windows, help is at least printed
+completely and then the user can continue with ENTER if needed.
 
-Zusätzliche technische Logik:
+Additional technical logic:
 
-- Wenn das Programm erkennt, dass es in einem interaktiven Terminal ausgeführt
-  wird, wird die Hilfe über pydoc.pager() ausgegeben.
-- In Terminals mit funktionierendem Pager kann der Benutzer die Hilfe über den
-  Pager schließen und kommt anschließend direkt zurück ins Menü.
-- Wenn kein interaktives Terminal erkannt wird, wird die Hilfe direkt ausgegeben
-  und der Benutzer muss mit ENTER bestätigen, bevor das Programm ins Menü
-  zurückkehrt bzw. beendet wird.
-- Dadurch wird vermieden, dass bei echten Pager-Terminals eine zusätzliche
-  unnötige ENTER-Bestätigung erforderlich ist.
-- Gleichzeitig bleibt das Verhalten für einfache Terminals, Windows-EXE-Starts
-  und Umgebungen ohne Pager sicher lesbar.
+- If the program detects that it is running in an interactive terminal, help is
+  printed through pydoc.pager().
+- In terminals with a working pager, the user can close the pager and then
+  return directly to the menu.
+- If no interactive terminal is detected, help is printed directly and the user
+  must confirm with ENTER before the program returns to the menu or exits.
+- This avoids an unnecessary extra ENTER confirmation in real pager terminals.
+- At the same time, simple terminals, Windows EXE starts, and environments
+  without a pager remain readable.
 
 ===============================================================================
-BENÖTIGTE DATEI- UND ORDNERSTRUKTUR
+LANGUAGE / TERMINAL COMPATIBILITY
 ===============================================================================
 
-Minimal erforderlich:
+Starting with version V1.3, all program text, help text, user interaction text,
+and documentation text are written in English only.
+
+Background:
+
+Earlier versions contained German text and umlauts. Some terminals, especially
+classic Windows cmd.exe configurations, can display such characters incorrectly.
+Instead of maintaining separate Unicode and ASCII variants, the complete program
+text was changed to English ASCII-friendly text.
+
+Behavior:
+
+- The program no longer prints German umlauts in help and documentation.
+- Output is easier to read in Linux terminals, Windows PowerShell, Windows cmd,
+  remote shells, and minimal terminal environments.
+- No automatic umlaut replacement is needed anymore.
+- The code remains easier to maintain because only one text variant exists.
+
+===============================================================================
+REQUIRED FILE AND DIRECTORY STRUCTURE
+===============================================================================
+
+Minimal required structure:
 
     jira_subtask_creator.py
     confluence_login.txt
     Subtasks/
         Subtasks_Impl.txt
 
-Beispiel mit mehreren Label-Dateien:
+Example with multiple label files:
 
     jira_subtask_creator.py
     confluence_login.txt
@@ -311,142 +331,151 @@ Beispiel mit mehreren Label-Dateien:
         Subtasks_Test.txt
         Subtasks_Spez.txt
 
-Bei Verwendung als Binary / EXE:
+When using a binary / EXE:
 
     jira_subtask_creator
     confluence_login.txt
     Subtasks/
         Subtasks_Impl.txt
 
-oder unter Windows:
+or on Windows:
 
     jira_subtask_creator.exe
     confluence_login.txt
     Subtasks/
         Subtasks_Impl.txt
 
-Wichtig:
+Important:
 
-- confluence_login.txt wird nicht in die Binary eingebettet.
-- Der Ordner Subtasks wird nicht in die Binary eingebettet.
-- Beide müssen beim Start neben dem Skript bzw. neben der Binary liegen.
+- confluence_login.txt is not embedded into the binary.
+- The Subtasks directory is not embedded into the binary.
+- Both must be located next to the script or binary when the program is started.
 
 ===============================================================================
-BEISPIELABLAUF
+EXAMPLE WORKFLOW
 ===============================================================================
 
-1. confluence_login.txt anlegen
+1. Create confluence_login.txt
 
     https://example.atlassian.net
     max.mustermann@example.com
     API_TOKEN
 
-2. Subtask-Datei anlegen
+2. Create a subtask definition file
 
     Subtasks/Subtasks_Impl.txt
 
-3. Subtask-Titel eintragen
+3. Add subtask titles
 
-    Implementierung durchführen
-    Unit Tests erstellen
-    Review durchführen
+    Implement feature
+    Create unit tests
+    Perform review
 
-4. In Jira einem Issue im Sprint das Label "Impl" geben
+4. Add the label "Impl" to a Jira issue inside the selected sprint
 
-5. Programm starten
+5. Start the program
 
     python jira_subtask_creator.py
 
-6. Im Menü Sprintauswahl wählen
+6. Select the sprint in the menu
 
-7. Programm erstellt die fehlenden Subtasks
+7. The program creates the missing subtasks
 
 ===============================================================================
-ERGEBNISBERICHT
+RESULT REPORT
 ===============================================================================
 
-Am Ende wird ein Report ausgegeben.
+At the end, a report is printed.
 
-Für jedes Haupt-Issue wird angezeigt:
+For every parent issue, the report shows:
 
-- Jira Key
-- Issue Typ
+- Jira key
+- Issue type
 - Summary
-- verwendetes Label
-- erstellte Subtasks je Label
-- übersprungene Subtasks je Label
+- Matching label
+- Created subtasks per label
+- Skipped subtasks per label
 
-Übersprungen bedeutet:
+Skipped means:
 
-- Subtask war bereits vorhanden
-- oder Subtask konnte nicht erstellt werden
+- the subtask already existed
+- or the subtask could not be created
 
-Wenn ein Issue mehrere Labels besitzt, zu denen Subtask-Dateien existieren,
-werden die erstellten und übersprungenen Subtasks im Report je Label gruppiert.
-Dadurch ist eindeutig sichtbar, aus welcher Subtask-Definitionsdatei bzw. durch
-welches Jira Label die jeweilige Unteraufgabe erzeugt oder übersprungen wurde.
+If an issue has multiple labels for which matching subtask definition files
+exist, created and skipped subtasks are grouped by label. This makes it clear
+which label and definition file caused each subtask to be created or skipped.
 
-Subtasks selbst werden nicht als eigene Haupt-Issues verarbeitet.
-
-===============================================================================
-WINDOWS / EXE VERHALTEN
-===============================================================================
-
-Ab Version V1.1 wartet das Programm vor dem Beenden immer auf eine
-ENTER-Bestätigung.
-
-Dies ist besonders wichtig, wenn die Windows EXE per Doppelklick gestartet wird.
-Ohne diese Bestätigung würde sich das Konsolenfenster bei Programmende oder bei
-einem Fehler sofort schließen, sodass der Benutzer die Meldung nicht lesen kann.
+Subtasks themselves are not processed as parent issues.
 
 ===============================================================================
-NEUERUNG V0.7
+WINDOWS / EXE BEHAVIOR
 ===============================================================================
 
-✔ Explizite Meldung bei geschlossenem Sprint
-✔ keine Subtask-Erstellung bei geschlossenen Sprints
-✔ klare Abbruchmeldung inkl. Sprintname
-✔ konsistente Statusprüfung im Standardmodus
+Starting with version V1.1, the program always waits for ENTER before exiting.
+
+This is especially important when the Windows EXE is started by double-click.
+Without this confirmation, the console window would close immediately at the end
+or on errors, so the user could not read the message.
 
 ===============================================================================
-NEUERUNG V1.0
+CHANGES IN V0.7
 ===============================================================================
 
-✔ V0.7 wurde als erste stabile Hauptversion übernommen
-✔ Programmversion wird zentral über APP_VERSION definiert
-✔ Programmausgabe und Hilfe verwenden APP_VERSION
-✔ Hilfe wurde für Binary-/EXE-Nutzung erweitert
-✔ Hilfe beschreibt benötigte Dateien und Ordner ausführlicher
-✔ Hilfe beschreibt empfohlene Token-Rechte und Scopes
-✔ Dokumentation beschreibt Nutzung als Python-Skript und als Binary/EXE
-✔ Report zeigt erstellte und übersprungene Subtasks gruppiert je Label
+- Explicit message for closed sprints
+- No subtask creation for closed sprints
+- Clear abort message including sprint name
+- Consistent sprint state validation in standard mode
 
 ===============================================================================
-NEUERUNG V1.1
+CHANGES IN V1.0
 ===============================================================================
 
-✔ Programm wartet vor jedem regulären Beenden auf ENTER
-✔ Programm wartet auch bei Fehlerfällen auf ENTER
-✔ Besseres Verhalten beim Start der Windows EXE per Doppelklick
-✔ Neuer Menümodus beim Start ohne Kommandozeilenoptionen
-✔ Dry-Run kann im Menü per [ ] / [x] umgeschaltet werden
-✔ Neue Kommandozeilenoption -s / --sprint für exakte Sprintauswahl
-✔ -s / --sprint benötigt einen nicht-leeren Sprintnamen
+- V0.7 was accepted as the first stable major version
+- Program version is centrally defined through APP_VERSION
+- Program output and help use APP_VERSION
+- Help was extended for binary / EXE usage
+- Help describes required files and directories in more detail
+- Help describes recommended token permissions and scopes
+- Documentation describes usage as Python script and as binary / EXE
+- Report shows created and skipped subtasks grouped by label
 
 ===============================================================================
-NEUERUNG V1.2
+CHANGES IN V1.1
 ===============================================================================
 
-✔ Hilfe ist nun auch direkt im interaktiven Menü auswählbar
-✔ Hilfe kehrt nach ENTER wieder ins Menü zurück
-✔ Hilfeausgabe nutzt eine Pager-Ausgabe, sofern vom Terminal unterstützt
-✔ Menü wurde um einen Hilfe-Menüpunkt erweitert
-✔ Dokumentation wurde um das Hilfeverhalten im Menü erweitert
-✔ Hilfeausgabe unterscheidet zwischen interaktivem Terminal und einfachem
-  Ausgabemodus ohne Pager
-✔ Bei funktionierendem Pager ist keine zusätzliche ENTER-Bestätigung nötig
-✔ Ohne interaktiven Pager wird ENTER zur Rückkehr ins Menü bzw. zum Beenden
-  abgefragt
+- Program waits for ENTER before every regular exit
+- Program also waits for ENTER in error cases
+- Improved behavior when starting the Windows EXE by double-click
+- New interactive main menu when started without options
+- Dry-run can be toggled in the menu using [ ] / [x]
+- New command line option -s / --sprint for exact sprint selection
+- -s / --sprint requires a non-empty sprint name
+
+===============================================================================
+CHANGES IN V1.2
+===============================================================================
+
+- Help is now available directly in the interactive menu
+- Help returns to the menu after the help view is closed
+- Help output uses a pager if supported by the terminal
+- Menu was extended with a help item
+- Documentation was extended with menu help behavior
+- Help output distinguishes between interactive terminal and simple output mode
+  without pager
+- If a working pager is available, no additional ENTER confirmation is needed
+- Without an interactive pager, ENTER is requested before returning to the menu
+  or exiting
+
+===============================================================================
+CHANGES IN V1.3
+===============================================================================
+
+- All program text was changed to English
+- All help text was changed to English
+- All documentation text was changed to English
+- German umlauts and German user interaction text were removed
+- Output is now more portable across Linux, Windows PowerShell, Windows cmd, and
+  minimal terminal environments
 
 ===============================================================================
 JIRA API
@@ -462,28 +491,30 @@ CHANGELOG
 ===============================================================================
 
 V0.0  Initial
-V0.1  Label-System
-V0.2  Search API + Dry Run
-V0.3  Subtask Filterung
-V0.4  Sprint Filtermodus
-V0.5  Stabilisierung + Dry Run fix
-V0.6  Closed Sprint Handling + Messages
-V0.7  Explizite Closed-Sprint Meldung vor Verarbeitung
-V1.0  Erste stabile Hauptversion auf Basis von V0.7
-      Zentrale Versionsdefinition über APP_VERSION
-      Erweiterte Hilfe für Binary-/EXE-Nutzung
-      Erweiterte Beschreibung der benötigten Dateien
-      Erweiterte Beschreibung der API-Token-Rechte
-      Reportausgabe gruppiert erstellte und übersprungene Subtasks je Label
-V1.1  Windows-/EXE-Verhalten verbessert
-      ENTER-Bestätigung vor Programmende und in Fehlerfällen
-      Interaktives Hauptmenü beim Start ohne Optionen
-      Dry-Run im Menü umschaltbar
-      Neue Option -s / --sprint für direkte exakte Sprintauswahl
-V1.2  Hilfe im interaktiven Menü ergänzt
-      Hilfeausgabe mit Pager-Unterstützung ergänzt
-      Rückkehr ins Menü nach Hilfeanzeige ergänzt
-      Pager-/Nicht-Pager-Verhalten für Hilfeausgabe verbessert
+V0.1  Label system
+V0.2  Search API + dry-run
+V0.3  Subtask output filtering
+V0.4  Sprint filter mode
+V0.5  Stabilization + dry-run fix
+V0.6  Closed sprint handling + messages
+V0.7  Explicit closed-sprint message before processing
+V1.0  First stable major version based on V0.7
+      Central version definition through APP_VERSION
+      Extended help for binary / EXE usage
+      Extended description of required files
+      Extended description of API token permissions
+      Report output grouped by created and skipped subtasks per label
+V1.1  Windows / EXE behavior improved
+      ENTER confirmation before program exit and in error cases
+      Interactive main menu when started without options
+      Dry-run toggle in menu
+      New option -s / --sprint for direct exact sprint selection
+V1.2  Help added to interactive menu
+      Help output with pager support added
+      Return to menu after help view added
+      Pager / non-pager behavior improved
+V1.3  Complete switch to English-only output and documentation
+      Removed need for umlaut / Unicode fallback handling
 
 ===============================================================================
 """
@@ -498,7 +529,7 @@ SUBTASK_DIR = "Subtasks"
 # EXIT / PAUSE HANDLING
 # ============================================================================
 
-def wait_for_enter(message="ENTER zum Beenden..."):
+def wait_for_enter(message="ENTER to exit..."):
     try:
         input(message)
     except EOFError:
@@ -508,7 +539,7 @@ def wait_for_enter(message="ENTER zum Beenden..."):
 def exit_with_enter(code=0, message=None):
     if message:
         print(message)
-    wait_for_enter("ENTER zum Beenden...")
+    wait_for_enter("ENTER to exit...")
     sys.exit(code)
 
 
@@ -518,7 +549,7 @@ def exit_with_enter(code=0, message=None):
 
 class PausingArgumentParser(argparse.ArgumentParser):
     def error(self, message):
-        print(f"Fehler: {message}")
+        print(f"Error: {message}")
         print()
         self.print_help()
         print()
@@ -534,10 +565,10 @@ def get_help_text():
 Jira Subtask Creator {APP_VERSION}
 
 ===============================================================================
-AUFRUF
+CALL
 ===============================================================================
 
-Python Skript:
+Python script:
 
   python jira_subtask_creator.py
   python jira_subtask_creator.py -s "Sprint Team 2"
@@ -545,7 +576,7 @@ Python Skript:
   python jira_subtask_creator.py -f "Team 2"
   python jira_subtask_creator.py --dry-run
 
-Linux Binary:
+Linux binary:
 
   ./jira_subtask_creator
   ./jira_subtask_creator -s "Sprint Team 2"
@@ -562,47 +593,47 @@ Windows EXE:
   jira_subtask_creator.exe --dry-run
 
 ===============================================================================
-OPTIONEN
+OPTIONS
 ===============================================================================
 
-  -s, --sprint TEXT     Sprintauswahl per exaktem Sprintnamen.
-                        TEXT ist zwingend erforderlich und darf nicht leer sein.
+  -s, --sprint TEXT     Select sprint by exact sprint name.
+                        TEXT is required and must not be empty.
 
-  -f, --filter [TEXT]   Sprintauswahl aus Liste.
-                        Ohne TEXT werden alle offenen/aktiven Sprints angezeigt.
-                        Mit TEXT werden nur Sprints angezeigt, deren Name diesen
-                        Text enthält.
+  -f, --filter [TEXT]   Select sprint from a list.
+                        Without TEXT, all open/active sprints are shown.
+                        With TEXT, only sprints whose name contains this text
+                        are shown.
 
   --dry-run             Simulation.
-                        Es werden keine Änderungen in Jira durchgeführt.
+                        No changes are made in Jira.
 
-  -h, --help            Diese Hilfe anzeigen.
+  -h, --help            Show this help.
 
 ===============================================================================
-MENÜMODUS
+MENU MODE
 ===============================================================================
 
-Wenn das Programm ohne Optionen gestartet wird, erscheint ein Menü:
+If the program is started without options, an interactive menu is shown:
 
-  1. Sprint per exaktem Namen auswählen
-  2. Sprint aus vorhandenen Sprints auswählen
+  1. Select sprint by exact name
+  2. Select sprint from existing sprints
   3. Dry-Run [ ] / [x]
-  4. Hilfe anzeigen
-  ENTER = Beenden
+  4. Show help
+  ENTER = Exit
 
-Wenn die Hilfe über das Menü geöffnet wird, kommt der Benutzer nach dem Beenden
-der Hilfe wieder zurück ins Menü.
+If help is opened from the menu, the user returns to the menu after closing the
+help view.
 
 ===============================================================================
-BENÖTIGTE DATEIEN
+REQUIRED FILES
 ===============================================================================
 
-Im gleichen Verzeichnis wie das Skript bzw. die Binary müssen liegen:
+The following must be located in the same directory as the script or binary:
 
   confluence_login.txt
   Subtasks/
 
-Beispielstruktur:
+Example structure:
 
   jira_subtask_creator
   confluence_login.txt
@@ -610,7 +641,7 @@ Beispielstruktur:
       Subtasks_Impl.txt
       Subtasks_Test.txt
 
-Oder bei Windows:
+Or on Windows:
 
   jira_subtask_creator.exe
   confluence_login.txt
@@ -619,101 +650,101 @@ Oder bei Windows:
       Subtasks_Test.txt
 
 ===============================================================================
-DATEI: confluence_login.txt
+FILE: confluence_login.txt
 ===============================================================================
 
-Die Datei muss genau diese Informationen enthalten:
+The file must contain exactly this information:
 
-  Zeile 1: Jira Cloud URL
-  Zeile 2: Login E-Mail-Adresse
-  Zeile 3: Atlassian API Token
+  Line 1: Jira Cloud URL
+  Line 2: Login email address
+  Line 3: Atlassian API token
 
-Beispiel:
+Example:
 
   https://example.atlassian.net
   max.mustermann@example.com
   ATATT3xFfGF0...
 
-Wichtig:
+Important:
 
-  - Die Datei nicht in Git einchecken.
-  - Der Token wird wie ein Passwort behandelt.
-  - Der Token muss zum Benutzer passen, der in Zeile 2 angegeben ist.
+  - Do not commit this file to Git.
+  - Treat the token like a password.
+  - The token must belong to the user specified in line 2.
 
 ===============================================================================
-ORDNER: Subtasks
+DIRECTORY: Subtasks
 ===============================================================================
 
-In diesem Ordner liegen die Subtask-Definitionen.
+This directory contains the subtask definitions.
 
-Dateinamensschema:
+File naming scheme:
 
   Subtasks_<LABEL>.txt
 
-Beispiele:
+Examples:
 
   Subtasks_Impl.txt
   Subtasks_Test.txt
   Subtasks_Spez.txt
 
-Bedeutung:
+Meaning:
 
   Subtasks_Impl.txt
 
-  → gilt für Jira Issues mit dem Label "Impl"
+  applies to Jira issues with the label "Impl"
 
-Inhalt der Datei:
+File content:
 
-  Eine Zeile = ein Subtask-Titel
+  One line = one subtask title
 
-Beispielinhalt:
+Example content:
 
-  Implementierung durchführen
-  Unit Tests erstellen
-  Review durchführen
+  Implement feature
+  Create unit tests
+  Perform review
 
 ===============================================================================
-TOKEN / RECHTE
+TOKEN / PERMISSIONS
 ===============================================================================
 
-Empfohlen wird ein klassischer Atlassian API Token.
+A classic Atlassian API token is recommended.
 
-Der Benutzer des Tokens benötigt im Jira Projekt Rechte zum:
+The token user needs Jira project permissions to:
 
-  - Boards und Sprints sehen
-  - Issues ansehen
-  - Issues erstellen
-  - Subtasks erstellen
+  - view boards and sprints
+  - view issues
+  - create issues
+  - create subtasks
 
-Scoped API Tokens können bei der Jira Software Agile API je nach Atlassian Cloud
-Umgebung mit 401 fehlschlagen.
+Scoped API tokens may fail with 401 on the Jira Software Agile API depending on
+the Atlassian Cloud environment.
 
 ===============================================================================
 REPORT
 ===============================================================================
 
-Der Report zeigt pro Haupt-Issue:
+The report shows for every parent issue:
 
-  - Jira Key
-  - Issue Typ
+  - Jira key
+  - Issue type
   - Summary
   - Label
-  - erstellte Subtasks
-  - übersprungene Subtasks
+  - Created subtasks
+  - Skipped subtasks
 
-Wenn mehrere Labels auf einem Issue vorhanden sind und zu diesen Labels passende
-Subtask-Dateien existieren, wird die Ausgabe je Label gruppiert.
+If an issue has multiple labels and matching subtask definition files exist,
+the output is grouped by label.
 
 ===============================================================================
-WICHTIGE REGELN
+IMPORTANT RULES
 ===============================================================================
 
-  - Nur active und future Sprints erlaubt.
-  - Closed Sprints werden abgelehnt.
-  - Subtasks werden nur bei active und future Sprints erstellt.
-  - Leere Eingaben beenden das Programm.
-  - Bereits vorhandene Subtasks werden nicht erneut erstellt.
-  - Subtasks selbst werden nicht weiter verarbeitet.
+  - Only active and future sprints are allowed.
+  - Closed sprints are rejected.
+  - Subtasks are only created for active and future sprints.
+  - Empty inputs exit the program.
+  - Existing subtasks are not created again.
+  - Subtasks themselves are not processed further.
 
 ===============================================================================
 """
@@ -726,7 +757,7 @@ def show_help(exit_after=True):
         pydoc.pager(help_text)
     else:
         print(help_text)
-        wait_for_enter("ENTER zum Fortfahren...")
+        wait_for_enter("ENTER to continue...")
 
     if exit_after:
         exit_with_enter(0)
@@ -738,13 +769,16 @@ def show_help(exit_after=True):
 
 def read_login():
     if not os.path.exists(LOGIN_FILE):
-        raise RuntimeError(f"Fehler: {LOGIN_FILE} nicht gefunden.")
+        raise RuntimeError(f"Error: {LOGIN_FILE} not found.")
 
     with open(LOGIN_FILE, "r", encoding="utf-8") as f:
         lines = [l.strip() for l in f.readlines() if l.strip()]
 
     if len(lines) < 3:
-        raise RuntimeError(f"Fehler: {LOGIN_FILE} muss mindestens 3 nicht-leere Zeilen enthalten, siehe Hlfe -h or --help")
+        raise RuntimeError(
+            f"Error: {LOGIN_FILE} must contain at least 3 non-empty lines. "
+            f"See help with -h or --help."
+        )
 
     return lines[0], lines[1], lines[2]
 
@@ -757,12 +791,15 @@ def load_subtask_definitions():
     result = {}
 
     if not os.path.isdir(SUBTASK_DIR):
-        raise RuntimeError(f"Fehler: Ordner '{SUBTASK_DIR}' fehlt.")
+        raise RuntimeError(f"Error: directory '{SUBTASK_DIR}' is missing.")
 
     files = glob.glob(os.path.join(SUBTASK_DIR, "Subtasks_*.txt"))
 
     if not files:
-        raise RuntimeError(f"Fehler: Keine Dateien 'Subtasks_*.txt' im Ordner '{SUBTASK_DIR}' gefunden.")
+        raise RuntimeError(
+            f"Error: no files matching 'Subtasks_*.txt' found in directory "
+            f"'{SUBTASK_DIR}'."
+        )
 
     for file in files:
         label = os.path.basename(file).replace("Subtasks_", "").replace(".txt", "")
@@ -850,25 +887,25 @@ def select_sprint_filtered(base_url, auth, filter_string=None):
         sprints = [s for s in sprints if filter_string.lower() in s["name"].lower()]
 
     if not sprints:
-        exit_with_enter(0, "Keine offenen/aktiven Sprints gefunden.")
+        exit_with_enter(0, "No open/active sprints found.")
 
-    print("\nVerfügbare offene/aktive Sprints:\n")
+    print("\nAvailable open/active sprints:\n")
 
     for i, s in enumerate(sprints, 1):
         print(f"{i}. {sprint_label(s)}")
 
     while True:
-        choice = input("\nSprint auswählen (ENTER = Abbruch): ").strip()
+        choice = input("\nSelect sprint (ENTER = abort): ").strip()
 
         if choice == "":
-            print("Programm wird beendet.")
+            print("Program will exit.")
             exit_with_enter(0)
 
         if choice.isdigit() and 1 <= int(choice) <= len(sprints):
             return sprints[int(choice) - 1]["name"]
 
-        print("Ungültige Auswahl.")
-        print("Programm wird beendet.")
+        print("Invalid selection.")
+        print("Program will exit.")
         exit_with_enter(0)
 
 
@@ -880,8 +917,8 @@ def validate_exact_sprint(base_url, auth, sprint_name):
 
             if is_closed_sprint(s):
                 print("\n========================================")
-                print(f"SPRINT GESCHLOSSEN: {sprint_name}")
-                print("Es werden KEINE Subtasks erstellt.")
+                print(f"SPRINT CLOSED: {sprint_name}")
+                print("NO subtasks will be created.")
                 print("========================================\n")
                 exit_with_enter(0)
 
@@ -947,12 +984,12 @@ def show_main_menu(dry_run):
     print("\n" + "=" * 72)
     print(f"Jira Subtask Creator {APP_VERSION}")
     print("=" * 72)
-    print("1. Sprint per exaktem Namen auswählen")
-    print("2. Sprint aus vorhandenen Sprints auswählen")
+    print("1. Select sprint by exact name")
+    print("2. Select sprint from existing sprints")
     print(f"3. Dry-Run {dry_run_marker}")
-    print("4. Hilfe anzeigen")
+    print("4. Show help")
     print()
-    print("ENTER = Beenden")
+    print("ENTER = Exit")
 
 
 def menu_select_sprint(base_url, auth, initial_dry_run):
@@ -960,27 +997,27 @@ def menu_select_sprint(base_url, auth, initial_dry_run):
 
     while True:
         show_main_menu(dry_run)
-        choice = input("\nAuswahl: ").strip()
+        choice = input("\nSelection: ").strip()
 
         if choice == "":
-            print("Programm wird beendet.")
+            print("Program will exit.")
             exit_with_enter(0)
 
         if choice == "1":
-            sprint_name = input("Sprintname (exakt, ENTER = Beenden): ").strip()
+            sprint_name = input("Sprint name (exact, ENTER = exit): ").strip()
 
             if sprint_name == "":
                 print()
                 exit_with_enter(0)
 
             if not validate_exact_sprint(base_url, auth, sprint_name):
-                print("Sprint nicht gefunden.")
+                print("Sprint not found.")
                 exit_with_enter(0)
 
             return sprint_name, dry_run
 
         if choice == "2":
-            filter_string = input("Filtertext optional (ENTER = alle offenen/aktiven Sprints): ").strip()
+            filter_string = input("Optional filter text (ENTER = all open/active sprints): ").strip()
             sprint_name = select_sprint_filtered(base_url, auth, filter_string)
             return sprint_name, dry_run
 
@@ -992,7 +1029,7 @@ def menu_select_sprint(base_url, auth, initial_dry_run):
             show_help(exit_after=False)
             continue
 
-        print("Ungültige Auswahl.")
+        print("Invalid selection.")
 
 
 # ============================================================================
@@ -1003,14 +1040,14 @@ def process_sprint(base_url, auth, definitions, sprint_name, dry_run):
     print(f"\nSprint: {sprint_name}")
 
     if dry_run:
-        print("DRY-RUN aktiv - es werden keine Änderungen in Jira durchgeführt.")
+        print("DRY-RUN active - no changes will be made in Jira.")
 
-    print("Lade Issues...")
+    print("Loading issues...")
 
     issues = search_issues_in_sprint(base_url, auth, sprint_name)
     issues = [i for i in issues if not is_subtask(i)]
 
-    print(f"{len(issues)} Issues gefunden.\n")
+    print(f"{len(issues)} issues found.\n")
 
     report = []
 
@@ -1066,22 +1103,22 @@ def process_sprint(base_url, auth, definitions, sprint_name, dry_run):
         print(f"\n{r['key']} [{r['type']}] {r['summary']}")
 
         if not r["labels"]:
-            print("  Keine Aktion.")
+            print("  No action.")
 
         for label, label_data in r["labels"].items():
             print(f"\n  Label: {label}")
 
             if label_data["created"]:
-                print("    Erstellt:")
+                print("    Created:")
                 for c in label_data["created"]:
                     print(f"      + {c}")
 
             if label_data["skipped"]:
-                print("    Übersprungen:")
+                print("    Skipped:")
                 for s in label_data["skipped"]:
                     print(f"      - {s}")
 
-    print("\nFertig.")
+    print("\nDone.")
 
 
 # ============================================================================
@@ -1120,16 +1157,16 @@ def main():
     filter_option_used = args.filter is not None
 
     if sprint_option_used and filter_option_used:
-        exit_with_enter(2, "Fehler: -s/--sprint und -f/--filter dürfen nicht gemeinsam verwendet werden.")
+        exit_with_enter(2, "Error: -s/--sprint and -f/--filter must not be used together.")
 
     if sprint_option_used:
         sprint_name = args.sprint.strip()
 
         if sprint_name == "":
-            exit_with_enter(2, "Fehler: -s/--sprint benötigt einen nicht-leeren Sprintnamen.")
+            exit_with_enter(2, "Error: -s/--sprint requires a non-empty sprint name.")
 
         if not validate_exact_sprint(base_url, auth, sprint_name):
-            print("Sprint nicht gefunden.")
+            print("Sprint not found.")
             exit_with_enter(0)
 
         dry_run = args.dry_run
@@ -1151,9 +1188,9 @@ if __name__ == "__main__":
     except SystemExit:
         raise
     except KeyboardInterrupt:
-        print("\nProgramm wurde durch Benutzer abgebrochen.")
+        print("\nProgram was aborted by user.")
         exit_with_enter(1)
     except Exception as e:
-        print("\nFEHLER:")
+        print("\nERROR:")
         print(e)
         exit_with_enter(1)
